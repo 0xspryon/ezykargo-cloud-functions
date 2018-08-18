@@ -1,3 +1,4 @@
+import { TrucksIntent } from './Trucks';
 import {Auth} from "./Auth"
 
-export {Auth}
+export {Auth,TrucksIntent}
