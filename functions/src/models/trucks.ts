@@ -20,4 +20,8 @@ export class Trucks {
     static isValidTechnicalVisit= (tv) =>{
         return true
     }
+
+    static isValidInsurrance= (insurrance) =>{
+        return true
+    }
 }

@@ -105,15 +105,57 @@ export class TrucksIntent {
             const tvDoc = {
                 frontImageUrl: FRONT_IMAGE_MV_PATH,
                 backImageUrl: BACK_IMAGE_MV_PATH,
-                maximunWeight: tvData.expirationDate,
+                expirationDate: tvData.expirationDate,
+                date: tvData.date,
                 createdAt: FieldValue.serverTimestamp(),
-                updatedAt: FieldValue.serverTimestamp(),
-                isDeleted: false
+                updatedAt: FieldValue.serverTimestamp()
             }
             console.log(tvDoc)
             // store it to firestore
             promises.push(admin.firestore().collection(Trucks.getRef(truckSnapShot.id)+'technical_visits').add(tvDoc))
             promises.push(admin.database().ref(`/intents/add_technical_visit/${uid}/${ref}`).remove())
+            return Promise.all(promises)
+        })
+
+    static listenAddInsurranceIntent = functions.database.ref('/intents/add_insurrance/{uid}/{ref}/finished')
+        .onUpdate(async (change,context)=>{
+            const snapshot = change.after
+            if(!snapshot.val())
+                return false
+            const uid = context.params.uid
+            const ref = context.params.ref
+
+            const insurranceSnapshot = await admin.database().ref(`/intents/add_insurrance/${uid}/${ref}`).once('value')
+            const insurranceData = insurranceSnapshot.val()
+            if(!Trucks.isValidInsurrance(insurranceData))
+                // format response and put into rtdb
+                return false
+            const truckSnapShot = await Trucks.getDoc(insurranceData.truck_id)
+            //check if user is trucks owner
+            if (truckSnapShot.data().owner_uid !== Users.getRef(uid))
+                // format response and put into rtdb
+                return false
+            const promises = []
+            //move images to new endpoint 
+            const front_image_path = insurranceData.FRONT_IMAGE_URL.path
+            const back_image_path = insurranceData.BACK_IMAGE_URL.path
+            const FRONT_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${front_image_path.split("/").pop()}`
+            const BACK_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${back_image_path.split("/").pop()}`
+            promises.push(File.moveFileFromTo(front_image_path,FRONT_IMAGE_MV_PATH))
+            promises.push(File.moveFileFromTo(back_image_path,BACK_IMAGE_MV_PATH))
+            // create tv doc
+            const insurranceDoc = {
+                frontImageUrl: FRONT_IMAGE_MV_PATH,
+                backImageUrl: BACK_IMAGE_MV_PATH,
+                expirationDate: insurranceData.expirationDate,
+                date: insurranceData.date,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp()
+            }
+            console.log(insurranceDoc)
+            // store it to firestore
+            promises.push(admin.firestore().collection(Trucks.getRef(truckSnapShot.id)+'insurrance').add(insurranceDoc))
+            promises.push(admin.database().ref(`/intents/add_insurrance/${uid}/${ref}`).remove())
             return Promise.all(promises)
         })
 }

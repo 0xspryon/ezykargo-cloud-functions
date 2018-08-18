@@ -6,4 +6,7 @@ import {Auth, TrucksIntent} from "./intent";
 admin.initializeApp(functions.config().firebase);
 
 export const onSignUpComplete = Auth.onSignUpComplete
+//trucks management
 export const listenAddTruckIntent = TrucksIntent.listenAddTruckIntent
+export const listenAddTechnicalVisitIntent = TrucksIntent.listenAddTechnicalVisitIntent
+export const listenAddInsurranceIntent = TrucksIntent.listenAddInsurranceIntent
