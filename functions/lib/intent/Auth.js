@@ -9,19 +9,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const admin = require("firebase-admin");
+const functions = require("firebase-functions");
 const File_1 = require("../utils/File");
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 class Auth {
 }
-Auth.signUp = (change, context) => __awaiter(this, void 0, void 0, function* () {
+Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
+    .onUpdate((change, context) => __awaiter(this, void 0, void 0, function* () {
     const snapshot = change.after;
-    console.log("SIGN UP CALL: " + context.params.auuid);
     if (!snapshot.val())
         return false;
     const auuid = context.params.auuid;
-    //create news users into firestore and link it with realtime database
     const userDataSnapshot = yield admin.database().ref(`/intents/sign_up/${auuid}`).once('value');
-    console.log(userDataSnapshot);
     //move images to correct bucket
     const promises = [];
     const nic_front_path = userDataSnapshot.val().NIC_FRONT_JPG.path;
@@ -33,12 +32,12 @@ Auth.signUp = (change, context) => __awaiter(this, void 0, void 0, function* () 
     promises.push(File_1.File.moveFileFromTo(nic_front_path, NIC_FRONT_PATH));
     promises.push(File_1.File.moveFileFromTo(nic_back_path, NIC_BACK_JPG_PATH));
     promises.push(File_1.File.moveFileFromTo(profile_path, PROFILE_JPG_PATH));
-    yield Promise.all(promises);
     //create new user doc to store into firestore
     const userDoc = {
         fullName: userDataSnapshot.val().user_info.fullName,
         firstName: userDataSnapshot.val().user_info.firstName,
         nicNumber: userDataSnapshot.val().user_info.nic_number,
+        phoneNumber: userDataSnapshot.val().user_info.phoneNumber,
         nicFrontUrl: NIC_FRONT_PATH,
         nicBackUrl: NIC_BACK_JPG_PATH,
         avatarUrl: PROFILE_JPG_PATH,
@@ -46,9 +45,23 @@ Auth.signUp = (change, context) => __awaiter(this, void 0, void 0, function* () 
         timestamp: FieldValue.serverTimestamp()
     };
     console.log(userDoc);
-    const userRef = yield admin.firestore().collection("/users").add(userDoc);
-    yield admin.database().ref(`/users/${auuid}`).set(userRef.id);
-    return admin.database().ref(`/intents/sign_up/${auuid}`).remove();
+    promises.push(admin.firestore().collection("/bucket/usersList/users").add(userDoc).then((userRef) => {
+        return admin.database().ref(`/users/${auuid}`).set(userRef);
+    }));
+    promises.push(admin.firestore().doc("/bucket/usersList").get().then((usersListSnaphsot) => {
+        let count = 0;
+        if (usersListSnaphsot.data().usersCount !== undefined && usersListSnaphsot.data().usersCount !== null)
+            count = usersListSnaphsot.data().usersCount + 1;
+        return usersListSnaphsot.ref.set({ usersCount: count }, { merge: true });
+    }));
+    //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
+    promises.push(admin.database().ref(`/intents/sign_up/${auuid}`).remove());
+    return Promise.all(promises);
+}));
+Auth.markPhoneNumberAsUsed = (phoneNumber) => __awaiter(this, void 0, void 0, function* () {
+    return admin.firestore().collection("/used_phone_numbers").add({
+        phoneNumber: phoneNumber
+    });
 });
 exports.Auth = Auth;
 //# sourceMappingURL=Auth.js.map
