@@ -3,10 +3,16 @@ import * as functions from 'firebase-functions';
 import {File} from '../utils/File';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
+
+ /*
+ * responses are given here following the http response codes as per the following link.
+ * https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+ *
+ */
 export class Auth {
+
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
-        .onUpdate(async (change,context)=>{
-            const snapshot = change.after
+        .onCreate(async (snapshot,context)=>{
             if(!snapshot.val())
                 return false
             const auuid = context.params.auuid
@@ -45,10 +51,10 @@ export class Auth {
                 return usersListSnaphsot.ref.set({usersCount: count},{merge: true})
             }))*/
             promises.push(admin.firestore().runTransaction(t=>{
-                const refUsers = admin.firestore().doc("/bucket/usersList")
-                return t.get(refUsers).then((usersListSnaphsot)=>{
+                const ref = admin.firestore().doc("/bucket/usersList")
+                return t.get(ref).then((usersListSnaphsot)=>{
                     const count = usersListSnaphsot.data().usersCount + 1
-                    return t.update(refUsers,{usersCount: count})
+                    return t.update(ref,{usersCount: count})
                 })
             }))
             //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
@@ -59,6 +65,51 @@ export class Auth {
     static markPhoneNumberAsUsed = async (phoneNumber) => {
         return admin.firestore().collection("/used_phone_numbers").add({
             phoneNumber: phoneNumber
+        });
+    }
+
+    static onAssociateMomoNumberIntent = functions.database.ref('intents/associate_phonenumber/{timestamp_midnight_today}/{newRef}')
+    .onCreate((snapshot, context) => {
+        const db = admin.database();
+        const intent = snapshot.val() as AssociatePhonenumber
+
+        if(intent.new_uid === intent.current_uid) return snapshot.ref.child("response").set({code: 201})
+        
+        return Auth.verifyUserDoesNotExistInDb(intent.new_uid)
+        .then( result => {
+            if (result) {
+                db.ref(`users/${intent.current_uid}`)
+                .once('value', data => {
+                    //  const { userRef } = data.val();
+                    console.log(intent.new_uid)
+                    db.ref(`users/${intent.new_uid}`).set(data.val())
+                        .then(val => {
+                            snapshot.ref.child("response")
+                            .set({code: 201})
+                        })
+                        .catch(err  => { console.log(`Error writting ressource at "users/${intent.new_uid}"`) })
+                })
+            }
+            return null;
+        })
+        .catch( err => {
+            snapshot.ref.child("response")
+            .set({code: 409})
+        })
+    })
+
+    static verifyUserDoesNotExistInDb = (uuid: string) => {
+        const db = admin.database();
+        let ref = db.ref(`users/${uuid}`);
+        return new Promise((resolve, reject) => {
+            ref.once("value", function(snapshot) {
+                if (snapshot.exists()) {
+                    reject(false);
+                    ;
+                } else {
+                    resolve(true);
+                }
+            })
         });
     }
 }
