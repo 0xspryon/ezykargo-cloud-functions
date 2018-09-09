@@ -20,8 +20,7 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 class Auth {
 }
 Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
-    .onUpdate((change, context) => __awaiter(this, void 0, void 0, function* () {
-    const snapshot = change.after;
+    .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
     if (!snapshot.val())
         return false;
     const auuid = context.params.auuid;
