@@ -3,7 +3,14 @@ import * as functions from 'firebase-functions';
 import {File} from '../utils/File';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
+
+ /*
+ * responses are given here following the http response codes as per the following link.
+ * https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+ *
+ */
 export class Auth {
+
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
         .onUpdate(async (change,context)=>{
             const snapshot = change.after
@@ -45,10 +52,10 @@ export class Auth {
                 return usersListSnaphsot.ref.set({usersCount: count},{merge: true})
             }))*/
             promises.push(admin.firestore().runTransaction(t=>{
-                const refUsers = admin.firestore().doc("/bucket/usersList")
-                return t.get(refUsers).then((usersListSnaphsot)=>{
+                const ref = admin.firestore().doc("/bucket/usersList")
+                return t.get(ref).then((usersListSnaphsot)=>{
                     const count = usersListSnaphsot.data().usersCount + 1
-                    return t.update(refUsers,{usersCount: count})
+                    return t.update(ref,{usersCount: count})
                 })
             }))
             //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
@@ -61,7 +68,6 @@ export class Auth {
             phoneNumber: phoneNumber
         });
     }
-
     static onAssociateMomoNumberIntent = functions.database.ref('intents/associate_phonenumber/{timestamp_midnight_today}/{newRef}')
     .onCreate((snapshot, context) => {
         const db = admin.database();
