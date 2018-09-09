@@ -67,11 +67,12 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
         }));
         return yield Promise.all(subPromises);
     }));
-    promises.push(admin.firestore().doc(models_1.Trucks.bucketPath).get().then((trucksListSnaphsot) => {
-        let count = 0;
-        if (trucksListSnaphsot.data().trucksCount !== undefined && trucksListSnaphsot.data().trucksCount !== null)
-            count = trucksListSnaphsot.data().trucksCount + 1;
-        return trucksListSnaphsot.ref.set({ trucksCount: count }, { merge: true });
+    promises.push(admin.firestore().runTransaction(t => {
+        const refTrucks = admin.firestore().doc(models_1.Trucks.bucketPath);
+        return t.get(refTrucks).then((trucksListSnaphsot) => {
+            const count = trucksListSnaphsot.data().trucksCount + 1;
+            return t.update(refTrucks, { trucksCount: count });
+        });
     }));
     // remove intention and evently add new response  
     promises.push(admin.database().ref(`/intents/add_truck/${uid}/${ref}`).remove());

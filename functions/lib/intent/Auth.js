@@ -48,11 +48,18 @@ Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finishe
     promises.push(admin.firestore().collection("/bucket/usersList/users").add(userDoc).then((userRef) => {
         return admin.database().ref(`/users/${auuid}`).set(userRef);
     }));
-    promises.push(admin.firestore().doc("/bucket/usersList").get().then((usersListSnaphsot) => {
-        let count = 0;
-        if (usersListSnaphsot.data().usersCount !== undefined && usersListSnaphsot.data().usersCount !== null)
-            count = usersListSnaphsot.data().usersCount + 1;
-        return usersListSnaphsot.ref.set({ usersCount: count }, { merge: true });
+    /*promises.push(admin.firestore().doc("/bucket/usersList").get().then((usersListSnaphsot)=>{
+        let count = 0
+        if(usersListSnaphsot.data().usersCount !==undefined && usersListSnaphsot.data().usersCount !==null)
+            count = usersListSnaphsot.data().usersCount + 1
+        return usersListSnaphsot.ref.set({usersCount: count},{merge: true})
+    }))*/
+    promises.push(admin.firestore().runTransaction(t => {
+        const refUsers = admin.firestore().doc("/bucket/usersList");
+        return t.get(refUsers).then((usersListSnaphsot) => {
+            const count = usersListSnaphsot.data().usersCount + 1;
+            return t.update(refUsers, { usersCount: count });
+        });
     }));
     //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
     promises.push(admin.database().ref(`/intents/sign_up/${auuid}`).remove());

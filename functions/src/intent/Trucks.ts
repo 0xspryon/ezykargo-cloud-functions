@@ -7,8 +7,8 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 export class TrucksIntent {
 
     static listenAddTruckIntent = functions.database.ref('/intents/add_truck/{uid}/{ref}/finished')
-        .onUpdate(async (change,context)=>{
-            const snapshot = change.after
+        .onCreate(async (snapshot,context)=>{
+            console.log(snapshot.val())
             if(!snapshot.val())
                 return false
             const uid = context.params.uid
@@ -42,7 +42,7 @@ export class TrucksIntent {
             console.log(truckDoc)
             //foreach all images and push it move it to another location
             truckData.images.forEach(currentItem => {
-                 promises.push(File.moveFileFromTo(currentItem.path,`/trucks/${uid}/${currentItem.path.split("/").pop()}`))
+                promises.push(File.moveFileFromTo(currentItem.path,`/trucks/${uid}/${currentItem.path.split("/").pop()}`))
             })
             
             promises.push( async () =>{
@@ -64,10 +64,10 @@ export class TrucksIntent {
             })
 
             promises.push(admin.firestore().runTransaction(t=>{
-                let ref = admin.firestore().doc(Trucks.bucketPath)
-                return t.get(ref).then((trucksListSnaphsot)=>{
-                    let count = trucksListSnaphsot.data().trucksCount + 1
-                    return t.update(ref,{trucksCount: count})
+                const refTrucks = admin.firestore().doc(Trucks.bucketPath)
+                return t.get(refTrucks).then((trucksListSnaphsot)=>{
+                    const count = trucksListSnaphsot.data().trucksCount + 1
+                    return t.update(refTrucks,{trucksCount: count})
                 })
             }))
             // remove intention and evently add new response  

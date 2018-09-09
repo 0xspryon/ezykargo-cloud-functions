@@ -45,10 +45,10 @@ export class Auth {
                 return usersListSnaphsot.ref.set({usersCount: count},{merge: true})
             }))*/
             promises.push(admin.firestore().runTransaction(t=>{
-                let ref = admin.firestore().doc("/bucket/usersList")
-                return t.get(ref).then((usersListSnaphsot)=>{
-                    let count = usersListSnaphsot.data().usersCount + 1
-                    return t.update(ref,{usersCount: count})
+                const refUsers = admin.firestore().doc("/bucket/usersList")
+                return t.get(refUsers).then((usersListSnaphsot)=>{
+                    const count = usersListSnaphsot.data().usersCount + 1
+                    return t.update(refUsers,{usersCount: count})
                 })
             }))
             //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
