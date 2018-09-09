@@ -41,7 +41,7 @@ Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finishe
         fullName: userDataSnapshot.val().user_info.fullName,
         firstName: userDataSnapshot.val().user_info.firstName,
         nicNumber: userDataSnapshot.val().user_info.nic_number,
-        phoneNumber: userDataSnapshot.val().user_info.phoneNumber,
+        phonenumber: userDataSnapshot.val().user_info.phonenumber,
         nicFrontUrl: NIC_FRONT_PATH,
         nicBackUrl: NIC_BACK_JPG_PATH,
         avatarUrl: PROFILE_JPG_PATH,
@@ -49,23 +49,28 @@ Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finishe
         timestamp: FieldValue.serverTimestamp()
     };
     console.log(userDoc);
-    promises.push(admin.firestore().collection("/bucket/usersList/users").add(userDoc).then((userRef) => {
-        return admin.database().ref(`/users/${auuid}`).set(userRef);
+    promises.push(new Promise((resolve, reject) => {
+        const userListDocument = admin.firestore().doc("/bucket/usersList");
+        userListDocument.collection('users').add(userDoc)
+            .then((userRef) => {
+            admin.database().ref(`/users/${auuid}`).set(userRef.id)
+                .catch(err => reject(err))
+                .then(() => admin.firestore().runTransaction(t => {
+                return t.get(userListDocument)
+                    .then((usersListSnaphsot) => {
+                    if (usersListSnaphsot.exists) {
+                        const data = usersListSnaphsot.data();
+                        const count = data.userCount + 1;
+                        t.update(userListDocument, { userCount: count });
+                        resolve("success");
+                    }
+                    reject('UsersListSnapshot exists not');
+                })
+                    .catch(err => reject(err));
+            }));
+        })
+            .catch(err => reject(err));
     }));
-    /*promises.push(admin.firestore().doc("/bucket/usersList").get().then((usersListSnaphsot)=>{
-        let count = 0
-        if(usersListSnaphsot.data().usersCount !==undefined && usersListSnaphsot.data().usersCount !==null)
-            count = usersListSnaphsot.data().usersCount + 1
-        return usersListSnaphsot.ref.set({usersCount: count},{merge: true})
-    }))*/
-    promises.push(admin.firestore().runTransaction(t => {
-        const ref = admin.firestore().doc("/bucket/usersList");
-        return t.get(ref).then((usersListSnaphsot) => {
-            const count = usersListSnaphsot.data().usersCount + 1;
-            return t.update(ref, { usersCount: count });
-        });
-    }));
-    //promises.push(Auth.markPhoneNumberAsUsed(userDataSnapshot.val().user_info.phoneNumber))
     promises.push(admin.database().ref(`/intents/sign_up/${auuid}`).remove());
     return Promise.all(promises);
 }));

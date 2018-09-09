@@ -68,7 +68,7 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
         return yield Promise.all(subPromises);
     }));
     promises.push(admin.firestore().runTransaction(t => {
-        let dbRef = admin.firestore().doc(models_1.Trucks.bucketPath);
+        const dbRef = admin.firestore().doc(models_1.Trucks.bucketPath);
         return t.get(dbRef).then((trucksListSnaphsot) => {
             const count = trucksListSnaphsot.data().trucksCount + 1;
             return t.update(dbRef, { trucksCount: count });
