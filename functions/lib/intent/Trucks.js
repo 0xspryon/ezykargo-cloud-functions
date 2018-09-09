@@ -16,8 +16,8 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 class TrucksIntent {
 }
 TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{uid}/{ref}/finished')
-    .onUpdate((change, context) => __awaiter(this, void 0, void 0, function* () {
-    const snapshot = change.after;
+    .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    console.log(snapshot.val());
     if (!snapshot.val())
         return false;
     const uid = context.params.uid;
