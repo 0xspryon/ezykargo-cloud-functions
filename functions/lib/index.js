@@ -7,6 +7,7 @@ const intent_1 = require("./intent");
 admin.initializeApp(functions.config().firebase);
 exports.onSignUpComplete = intent_1.Auth.onSignUpComplete;
 exports.onAssociateMomoNumberIntent = intent_1.Auth.onAssociateMomoNumberIntent;
+exports.onDeleteMomoProviderIntent = intent_1.Auth.onDeleteMomoProviderIntent;
 //trucks management
 exports.listenAddTruckIntent = intent_1.TrucksIntent.listenAddTruckIntent;
 exports.listenAddTechnicalVisitIntent = intent_1.TrucksIntent.listenAddTechnicalVisitIntent;

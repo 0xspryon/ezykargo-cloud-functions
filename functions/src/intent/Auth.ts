@@ -29,11 +29,14 @@ export class Auth {
             promises.push(File.moveFileFromTo(nic_back_path,NIC_BACK_JPG_PATH))
             promises.push(File.moveFileFromTo(profile_path,PROFILE_JPG_PATH))
             //create new user doc to store into firestore
+            const phonenumber= userDataSnapshot.val().user_info.phonenumber;
+            const momo_provider= userDataSnapshot.val().user_info.momo_provider;
+
             const userDoc = {
-                fullName: userDataSnapshot.val().user_info.fullName,
-                firstName: userDataSnapshot.val().user_info.firstName,
+                fullName: userDataSnapshot.val().user_info.firstname + " " + userDataSnapshot.val().user_info.other_name ,
+                firstName: userDataSnapshot.val().user_info.firstname,
                 nicNumber: userDataSnapshot.val().user_info.nic_number,
-                phonenumber: userDataSnapshot.val().user_info.phonenumber,
+                transaction_pin_code: userDataSnapshot.val().user_info.transaction_code,
                 nicFrontUrl: NIC_FRONT_PATH,
                 nicBackUrl: NIC_BACK_JPG_PATH,
                 avatarUrl: PROFILE_JPG_PATH,
@@ -46,9 +49,14 @@ export class Auth {
                     const userListDocument = admin.firestore().doc("/bucket/usersList")
                     userListDocument.collection('users').add(userDoc)
                         .then((userRef)=>{
-                            admin.database().ref(`/users/${auuid}`).set(userRef.id)
-                            .catch(err => reject(err))
-                            .then( () =>
+                            const doc = userRef.collection('momo_providers').doc();
+                            promises.push(
+                                doc.set({momo_provider , phonenumber, refPath: doc.path, authUid: auuid})
+                            )
+                            promises.push(
+                                admin.database().ref(`/users/${auuid}`).set(userRef.path)
+                            )
+                            promises.push(
                                 admin.firestore().runTransaction(t=>{
                                     return t.get(userListDocument)
                                         .then((usersListSnaphsot)=>{
@@ -56,13 +64,12 @@ export class Auth {
                                                 const data = usersListSnaphsot.data();
                                                 const count = data.userCount + 1
                                                 t.update(userListDocument,{userCount: count})
-                                                resolve("success")
                                             }
                                             reject('UsersListSnapshot exists not')
                                         })
-                                        .catch( err => reject(err))
-                                })
-                            );
+                                    })
+                            )
+                            resolve("success")
                         })
                         .catch( err => reject(err))
 
@@ -79,36 +86,42 @@ export class Auth {
         });
     }
     static onAssociateMomoNumberIntent = functions.database.ref('intents/associate_phonenumber/{timestamp_midnight_today}/{newRef}')
-    .onCreate((snapshot, context) => {
+    .onCreate((snapshot) => {
         const db = admin.database();
+        const promises: Promise<any>[] = [];
         const intent = snapshot.val() as AssociatePhonenumber
 
         if(intent.new_uid === intent.current_uid) return snapshot.ref.child("response").set({code: 201})
         
         return Auth.verifyUserDoesNotExistInDb(intent.new_uid)
-        .then( result => {
-            if (result) {
-                db.ref(`users/${intent.current_uid}`)
-                .once('value', data => {
-                    //  const { userRef } = data.val();
-                    console.log(intent.new_uid)
-                    db.ref(`users/${intent.new_uid}`).set(data.val())
-                        .then(val => {
-                            snapshot.ref.child("response")
-                            .set({code: 201})
-                        })
-                        .catch(err  => { console.log(`Error writting ressource at "users/${intent.new_uid}"`) })
+                .then( result => {
+                        return db.ref(`users/${intent.current_uid}`)
+                                .once('value', data => {
+                                    const firestoreRefPathString: string = data.val();
+                                    const doc = admin.firestore().doc(`${firestoreRefPathString}`).collection(`/momo_providers`).doc();
+                                    promises.push( 
+                                        doc.set({momo_provider: intent.momo_provider , phonenumber: intent.new_uid_phonenumber, refPath: doc.path, authUid: intent.new_uid})
+                                    )
+
+                                    promises.push(
+                                        db.ref(`users/${intent.new_uid}`).set( firestoreRefPathString )
+                                            .then(val => {
+                                                snapshot.ref.child("response")
+                                                .set({code: 201})
+                                            })
+                                            .catch(err  => { console.log(`Error writting ressource at "users/${intent.new_uid}"`) })
+                                    )
+                                    return Promise.all(promises);
+                                })
                 })
-            }
-            return null;
-        })
-        .catch( err => {
-            snapshot.ref.child("response")
-            .set({code: 409})
-        })
+                .catch( err => {
+                    snapshot.ref.child("response")
+                    .set({code: 409})
+                })
+
     })
 
-    static verifyUserDoesNotExistInDb = (uuid: string) => {
+   static verifyUserDoesNotExistInDb = (uuid: string) => {
         const db = admin.database();
         const ref = db.ref(`users/${uuid}`);
         return new Promise((resolve, reject) => {
@@ -122,4 +135,17 @@ export class Auth {
             })
         });
     }
+
+    static onDeleteMomoProviderIntent = functions.database.ref('intents/delete_momo_provider/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const intent = snapshot.val() as DeleteMomoProvider
+
+            //@Fixme: checkout later on how to delete a user account created through firebase auth via code( js/nodejs)
+            const doc = admin.firestore().doc(intent.ref_path);
+            const firebaseDbRef = admin.database().ref(`users/${intent.auth_uid}`);
+            const promises: Promise<any>[] = [doc.delete(), firebaseDbRef.remove(), snapshot.ref.remove()];
+            return Promise.all(promises);
+        });
+
+
 }
