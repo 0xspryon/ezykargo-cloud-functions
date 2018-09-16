@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import {Users} from "./users";
 
 export class Trucks {
     
@@ -13,7 +14,10 @@ export class Trucks {
         return admin.firestore().doc(Trucks.getRef(id)).get()
     }
 
-    static isValidTruck= (truck) =>{
+    static isValidTruck= async (truck) =>{
+        if(truck.driverRef!=="N/A")
+            if(! await Users.refExsits(truck.driverRef))
+                return 404
         return true
     }
 

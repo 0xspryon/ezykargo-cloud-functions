@@ -18,11 +18,17 @@ export class TrucksIntent {
             const truckData = truckDataSnapshot.val()
             console.log(truckData)
             //check if data is correct
-            if (!Trucks.isValidTruck(truckData))
+            const response = await Trucks.isValidTruck(truckData) ;
+            if (response !==true){
                 // format response and put into rtdb
+                truckDataSnapshot.child("response")
+                    .set({code: response})
                 return false
+            }
             //create new truck doc to store into firestore
             const promises = []
+            const end_date = new Date(Number.parseInt(truckData.start_date))
+            end_date.setFullYear(end_date.getFullYear()+10)
             const truckDoc = {
                 carrying_capacity:  truckData.carrying_capacity,
                 category: truckData.category,
@@ -36,7 +42,7 @@ export class TrucksIntent {
                     rc_number: truckData.rc_number,
                     rc_ssdt_id: truckData.rc_ssdt_id,
                     start_date:  truckData.start_date,
-                    end_date: truckData.end_date,
+                    end_date: end_date.getTime(),
                     image: "",
                 },
                 start_work:  truckData.start_work,
@@ -50,65 +56,81 @@ export class TrucksIntent {
             }
 
             console.log(truckDoc)
+            const uid = truckData.userRef.split("/").pop()
             // move registration certificate image
             const ivRcString = truckData.ivRcString
-            const newIvRcString = `/trucks/rc/${ivRcString.split("/").pop()}`
+            const newIvRcString = `/trucks/${uid}/rc/${ivRcString.split("/").pop()}`
             truckDoc.registration_certificate.image = newIvRcString
             promises.push(File.moveFileFromTo(ivRcString,newIvRcString))
             //moves truck images
             const imageCar1 = truckData.imageCar1
-            const newImageCar1 = `/trucks/${imageCar1.split("/").pop()}`
+            const newImageCar1 = `/trucks/${uid}/${imageCar1.split("/").pop()}`
             truckDoc.image = newImageCar1
             promises.push(File.moveFileFromTo(imageCar1,newImageCar1))
 
             const imageCar2 = truckData.imageCar2
-            const newImageCar2 = `/trucks/${imageCar2.split("/").pop()}`
+            const newImageCar2 = `/trucks/${uid}/${imageCar2.split("/").pop()}`
             promises.push(File.moveFileFromTo(imageCar2,newImageCar2))
 
             const imageCar3 = truckData.imageCar3
-            const newImageCar3 = `/trucks/${imageCar3.split("/").pop()}`
+            const newImageCar3 = `/trucks/${uid}/${imageCar3.split("/").pop()}`
             promises.push(File.moveFileFromTo(imageCar3,newImageCar3))
 
             const imageCar4 = truckData.imageCar4
-            const newImageCar4 = `/trucks/${imageCar4.split("/").pop()}`
+            const newImageCar4 = `/trucks/${uid}/${imageCar4.split("/").pop()}`
             promises.push(File.moveFileFromTo(imageCar4,newImageCar4))
 
             const imageCar5 = truckData.imageCar5
-            const newImageCar5 = `/trucks/${imageCar5.split("/").pop()}`
+            const newImageCar5 = `/trucks/${uid}/${imageCar5.split("/").pop()}`
             promises.push(File.moveFileFromTo(imageCar5,newImageCar5))
 
             const imageCar6 = truckData.imageCar6
-            const newImageCar6 = `/trucks/${imageCar6.split("/").pop()}`
+            const newImageCar6 = `/trucks/${uid}/${imageCar6.split("/").pop()}`
             promises.push(File.moveFileFromTo(imageCar6,newImageCar6))
 
-            promises.push( async () =>{
-                //wait until truck not added
-                const truckRef = await admin.firestore().collection(Trucks.basePath).add(truckDoc)
-                const subPromises = []
-                subPromises.push(truckRef.collection("images").add({url: newImageCar1}))
-                subPromises.push(truckRef.collection("images").add({url: newImageCar2}))
-                subPromises.push(truckRef.collection("images").add({url: newImageCar3}))
-                subPromises.push(truckRef.collection("images").add({url: newImageCar4}))
-                subPromises.push(truckRef.collection("images").add({url: newImageCar5}))
-                subPromises.push(truckRef.collection("images").add({url: newImageCar6}))
-                subPromises.push(admin.firestore().runTransaction(t=>{
-                    const refTrucks = admin.firestore().doc(Trucks.bucketPath)
-                    return t.get(refTrucks).then((trucksListSnaphsot)=>{
-                        const count = trucksListSnaphsot.data().trucksCount + 1
-                        return t.update(refTrucks,{trucksCount: count})
+            const truckRef = admin.firestore().collection(Trucks.basePath).doc()
+            promises.push( new Promise((resolve, reject) => {
+                truckRef.set(truckDoc).then(()=> {
+                    console.log(truckRef)
+                    const subPromises = []
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar1}))
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar2}))
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar3}))
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar4}))
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar5}))
+                    subPromises.push(truckRef.collection("images").add({url: newImageCar6}))
+                    subPromises.push(admin.firestore().runTransaction(t=>{
+                        const refTrucks = admin.firestore().doc(Trucks.bucketPath)
+                        return t.get(refTrucks).then((trucksListSnaphsot)=>{
+                            const count = trucksListSnaphsot.data().trucksCount + 1
+                            return t.update(refTrucks,{trucksCount: count})
+                        })
+                    }))
+                    // remove intention and evently add new response  
+                    //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
+                    if(truckData.driverRef!=="N/A")
+                        subPromises.push(truckRef.collection('drivers').add({
+                            driverRef: Users.getRef(truckData.driverRef),
+                            amount: 0,
+                            idle: false
+                        }))
+                    Promise.all(subPromises).then(()=> {
+                        
+                        truckDataSnapshot.child("response")
+                            .set({code: 201}).then(()=> {
+                                resolve(true) 
+                            }).catch((err)=> {
+                                reject(err)
+                            })
+                    }).catch((err)=> {
+                        reject(err)
                     })
-                }))
-                // remove intention and evently add new response  
-                subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
-                /*subPromises.push(truckRef.collection('drivers').add({
-                    driver_uid: Users.getRef(truckData.driver_uid),
-                    amount: 0,
-                    idle: false
-                }))*/
-                return await Promise.all(subPromises)
-            })
-            await Promise.all(promises)
-            return true
+                }).catch((err)=> {
+                    reject(err)
+                })
+            }))
+
+            return Promise.all(promises)
         })
     
     static listenAddTechnicalVisitIntent = functions.database.ref('/intents/add_technical_visit/{uid}/{ref}/finished')

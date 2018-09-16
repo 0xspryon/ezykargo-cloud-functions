@@ -12,4 +12,10 @@ export class Users {
     static getDoc = async (uid)=>{
         return admin.firestore().doc(Users.getRef(uid)).get()
     }
+
+    static refExsits = async (userRef) =>{
+        const dataSnapshot = await admin.firestore().doc(userRef).get()
+        const result = dataSnapshot.exists;
+        return result;
+    }
 }
