@@ -7,6 +7,7 @@ admin.initializeApp(functions.config().firebase);
 
 export const onSignUpComplete = Auth.onSignUpComplete
 export const onAssociateMomoNumberIntent = Auth.onAssociateMomoNumberIntent
+export const onDeleteMomoProviderIntent = Auth.onDeleteMomoProviderIntent
 
 //trucks management
 export const listenAddTruckIntent = TrucksIntent.listenAddTruckIntent
