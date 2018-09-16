@@ -6,6 +6,28 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 export class TrucksIntent {
 
+    static listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
+        .onCreate((snapshot,context)=>{
+            const truckDataSnapshot =snapshot.val()
+            return Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot)=>{
+                if(!truckSnapshot.exists){
+                    snapshot.ref.child("response").set({code: 404})
+                    return false;
+                }
+                if(truckSnapshot.get('userRef')===truckDataSnapshot.userRef){
+                    truckSnapshot.ref.delete()
+                    snapshot.ref.child("response").set({code: 200})
+                    return true
+                }else{
+                  snapshot.ref.child("response").set({code: 401})
+                  return false;
+                }
+            }).catch((err)=>{
+                snapshot.ref.child("response").set({code: 500})
+                return false;
+            })
+        })
+
     static listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
         .onCreate(async (snapshot,context)=>{
             console.log(snapshot.val())
