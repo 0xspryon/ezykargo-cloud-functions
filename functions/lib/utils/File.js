@@ -15,10 +15,11 @@ const fs = require('fs');
 class File {
 }
 File.moveFileFromTo = (from, to) => __awaiter(this, void 0, void 0, function* () {
+    console.log(from, to);
     // Download file from bucket.
     const fileName = from.split("/").pop();
     const bucket = admin.storage().bucket();
-    const tempFilePath = path.join(os.tmpdir(), fileName);
+    const tempFilePath = path.join(os.tmpdir(), ((new Date).getTime()) + "-" + fileName);
     const file = bucket.file(from);
     return file.download({
         destination: tempFilePath,
