@@ -128,9 +128,9 @@ export class TrucksIntent {
                     }))
                     // remove intention and evently add new response  
                     //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
-                    if(truckData.driverRef!=="N/A")
+                    if(truckData.driver_ref!=="N/A")
                         subPromises.push(truckRef.collection('drivers').add({
-                            driverRef: Users.getRef(truckData.driverRef),
+                            driver_ref: Users.getRef(truckData.driver_ref),
                             amount: 0,
                             idle: false
                         }))

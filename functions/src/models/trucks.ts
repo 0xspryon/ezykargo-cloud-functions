@@ -18,8 +18,8 @@ export class Trucks {
     }
 
     static isValidTruck= async (truck) =>{
-        if(truck.driverRef!=="N/A")
-            if(! await Users.refExsits(truck.driverRef))
+        if(truck.driver_ref!=="N/A")
+            if(! await Users.refExsits(truck.driver_ref))
                 return 404
         return true
     }
