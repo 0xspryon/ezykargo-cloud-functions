@@ -10,6 +10,7 @@ exports.onAssociateMomoNumberIntent = intent_1.Auth.onAssociateMomoNumberIntent;
 exports.onDeleteMomoProviderIntent = intent_1.Auth.onDeleteMomoProviderIntent;
 //trucks management
 exports.listenAddTruckIntent = intent_1.TrucksIntent.listenAddTruckIntent;
+exports.listenDeleteTruckIntent = intent_1.TrucksIntent.listenDeleteTruckIntent;
 exports.listenAddTechnicalVisitIntent = intent_1.TrucksIntent.listenAddTechnicalVisitIntent;
 exports.listenAddInsurranceIntent = intent_1.TrucksIntent.listenAddInsurranceIntent;
 //# sourceMappingURL=index.js.map

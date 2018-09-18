@@ -38,10 +38,9 @@ export class TrucksIntent {
 
             const truckDataSnapshot = await admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).once('value')
             const truckData = truckDataSnapshot.val()
-            console.log(truckData)
             //check if data is correct
             const response = await Trucks.isValidTruck(truckData) ;
-            if (response !==true){
+            if (response !== true){
                 // format response and put into rtdb
                 truckDataSnapshot.child("response")
                     .set({code: response})
@@ -76,7 +75,6 @@ export class TrucksIntent {
                 updatedAt: FieldValue.serverTimestamp(),
                 isDeleted: false
             }
-
             console.log(truckDoc)
             const uid = truckData.userRef.split("/").pop()
             // move registration certificate image

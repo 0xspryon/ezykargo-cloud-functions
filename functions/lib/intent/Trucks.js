@@ -15,6 +15,28 @@ const models_1 = require("../models");
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 class TrucksIntent {
 }
+TrucksIntent.listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
+    .onCreate((snapshot, context) => {
+    const truckDataSnapshot = snapshot.val();
+    return models_1.Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot) => {
+        if (!truckSnapshot.exists) {
+            snapshot.ref.child("response").set({ code: 404 });
+            return false;
+        }
+        if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
+            truckSnapshot.ref.delete();
+            snapshot.ref.child("response").set({ code: 200 });
+            return true;
+        }
+        else {
+            snapshot.ref.child("response").set({ code: 401 });
+            return false;
+        }
+    }).catch((err) => {
+        snapshot.ref.child("response").set({ code: 500 });
+        return false;
+    });
+});
 TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
     .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
     console.log(snapshot.val());
@@ -24,7 +46,6 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
     const timestamp = context.params.timestamp;
     const truckDataSnapshot = yield admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).once('value');
     const truckData = truckDataSnapshot.val();
-    console.log(truckData);
     //check if data is correct
     const response = yield models_1.Trucks.isValidTruck(truckData);
     if (response !== true) {

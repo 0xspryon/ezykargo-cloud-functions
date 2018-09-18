@@ -15,6 +15,9 @@ Users.basePath = "/bucket/usersList/users/";
 Users.getRef = (uid) => {
     return `${Users.basePath}${uid}`;
 };
+Users.getDocByRef = (ref) => __awaiter(this, void 0, void 0, function* () {
+    return admin.firestore().doc(ref).get();
+});
 Users.getDoc = (uid) => __awaiter(this, void 0, void 0, function* () {
     return admin.firestore().doc(Users.getRef(uid)).get();
 });

@@ -9,6 +9,11 @@ export class Users {
         return `${Users.basePath}${uid}`
     }
 
+    
+    static getDocByRef = async (ref)=>{
+        return admin.firestore().doc(ref).get()
+    }
+    
     static getDoc = async (uid)=>{
         return admin.firestore().doc(Users.getRef(uid)).get()
     }
