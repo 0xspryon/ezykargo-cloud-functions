@@ -136,7 +136,7 @@ export class TrucksIntent {
                         }))
                     Promise.all(subPromises).then(()=> {
                         
-                        truckDataSnapshot.child("response")
+                        snapshot.ref.child("response")
                             .set({code: 201}).then(()=> {
                                 resolve(true) 
                             }).catch((err)=> {

@@ -24,8 +24,8 @@ Trucks.getDoc = (id) => __awaiter(this, void 0, void 0, function* () {
     return admin.firestore().doc(Trucks.getRef(id)).get();
 });
 Trucks.isValidTruck = (truck) => __awaiter(this, void 0, void 0, function* () {
-    if (truck.driverRef !== "N/A")
-        if (!(yield users_1.Users.refExsits(truck.driverRef)))
+    if (truck.driver_ref !== "N/A")
+        if (!(yield users_1.Users.refExsits(truck.driver_ref)))
             return 404;
     return true;
 });

@@ -130,14 +130,14 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
             }));
             // remove intention and evently add new response  
             //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
-            if (truckData.driverRef !== "N/A")
+            if (truckData.driver_ref !== "N/A")
                 subPromises.push(truckRef.collection('drivers').add({
-                    driverRef: models_1.Users.getRef(truckData.driverRef),
+                    driver_ref: models_1.Users.getRef(truckData.driver_ref),
                     amount: 0,
                     idle: false
                 }));
             Promise.all(subPromises).then(() => {
-                truckDataSnapshot.child("response")
+                snapshot.ref.child("response")
                     .set({ code: 201 }).then(() => {
                     resolve(true);
                 }).catch((err) => {
