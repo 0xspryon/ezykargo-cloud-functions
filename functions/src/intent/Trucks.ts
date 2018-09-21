@@ -42,7 +42,7 @@ export class TrucksIntent {
             const response = await Trucks.isValidTruck(truckData) ;
             if (response !== true){
                 // format response and put into rtdb
-                truckDataSnapshot.child("response")
+                admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
                     .set({code: response})
                 return false
             }
@@ -136,7 +136,7 @@ export class TrucksIntent {
                         }))
                     Promise.all(subPromises).then(()=> {
                         
-                        snapshot.ref.child("response")
+                        admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
                             .set({code: 201}).then(()=> {
                                 resolve(true) 
                             }).catch((err)=> {
