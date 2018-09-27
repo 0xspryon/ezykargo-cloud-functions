@@ -5,6 +5,7 @@ export class Trucks {
     
     static bucketPath: string = "/bucket/trucksList/";
     static basePath: string = `${Trucks.bucketPath}trucks/`;
+    static driver;
 
     static getRef = (id) =>{
         return `${Trucks.basePath}${id}`
@@ -17,10 +18,13 @@ export class Trucks {
         return admin.firestore().doc(Trucks.getRef(id)).get()
     }
 
+    
     static isValidTruck= async (truck) =>{
         if(truck.driver_ref!=="N/A")
             if(! await Users.refExsits(truck.driver_ref))
                 return 404
+            else
+                Trucks.driver = Users.user
         return true
     }
 

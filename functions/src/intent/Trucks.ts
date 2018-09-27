@@ -8,23 +8,112 @@ export class TrucksIntent {
 
     static listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
         .onCreate((snapshot,context)=>{
-            const truckDataSnapshot =snapshot.val()
+            const truckDataSnapshot = snapshot.val()
             return Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot)=>{
                 if(!truckSnapshot.exists){
                     snapshot.ref.child("response").set({code: 404})
-                    return false;
+                    return false
                 }
                 if(truckSnapshot.get('userRef')===truckDataSnapshot.userRef){
-                    truckSnapshot.ref.delete()
-                    snapshot.ref.child("response").set({code: 200})
-                    return true
+                    return truckSnapshot.ref.set({
+                        deletedAt: FieldValue.serverTimestamp(),isDeleted:true},{merge: true})
+                        .then(()=>{
+                            snapshot.ref.child("response").set({code: 200})
+                            return true
+                        })
+                        .catch((err)=>{
+                            snapshot.ref.child("response").set({code: 500})
+                            return false
+                        });
                 }else{
                   snapshot.ref.child("response").set({code: 401})
-                  return false;
+                  return false
                 }
             }).catch((err)=>{
                 snapshot.ref.child("response").set({code: 500})
-                return false;
+                return false
+            })
+        })
+
+    /*
+    @Change driver of one truck
+    - check if new driver exists
+    - get previous driver and set it to idle
+    - remove truck from previous driver
+    - push new driver
+    - add driver info to truck
+    - add truck to driver
+    - return code 200
+    */
+    static listenLinkNewDriverTruckIntent = functions.database.ref('/intents/link_new_driver_truck/{timestamp}/{truk_ref}')
+        .onCreate( (snapshot,context)=>{
+            const truckDataSnapshot = snapshot.val()
+            return Trucks.getDocByRef(truckDataSnapshot.truckRef).then(async (truckSnapshot)=>{
+                if(!truckSnapshot.exists){
+                    snapshot.ref.child("response").set({code: 404})
+                    return false
+                }
+                if(truckDataSnapshot.driverRef!== "N/A" && !Users.refExsits(truckDataSnapshot.driverRef)){
+                    snapshot.ref.child("response").set({code: 404})
+                    return false
+                }
+                if(truckSnapshot.get('userRef')===truckDataSnapshot.userRef){
+                    const promises = []
+                    promises.push(admin.firestore().collection(Trucks.getRef(context.params.truk_ref+"/drivers"))
+                        .where("idle","==",false)
+                        .limit(1)
+                        .onSnapshot((driverQuerySnapshot)=>{
+                            driverQuerySnapshot.forEach((driverSnapshot)=>{
+                                promises.push(driverSnapshot.ref.set({idle: true},{merge: true}))
+                                //remove truck from driver
+                                promises.push(Users.getDocByRef(driverSnapshot.data().driverRef).then((driverUserRef)=>{
+                                    return driverUserRef.ref.set({truck: null},{merge: true})
+                                }))
+                            })
+                        }))
+                    if(truckDataSnapshot.driverRef!== "N/A"){
+                        //add driver inside drivers list
+                        promises.push(truckSnapshot.ref.collection("drivers") .add({
+                            driver_ref:truckDataSnapshot.driverRef,
+                            amount: 0,
+                            idle: false,
+                            createdAt: FieldValue.serverTimestamp()
+                        }))
+                        //add driver info to truck
+                        promises.push(truckSnapshot.ref.set({driver: {
+                            fullName: Users.user.fullName,
+                        }},{merge: true}))
+                        //add truck info to driver
+                        promises.push(Users.user.ref.set({truck: {
+                            images: truckSnapshot.ref +"/images",
+                            carrying_capacity:  truckSnapshot.get('carrying_capacity'),
+                            category:truckSnapshot.get('category'),
+                            common_name:truckSnapshot.get('common_name'),
+                            immatriculation:truckSnapshot.get('immatriculation'),
+                            make_by:truckSnapshot.get('make_by'),
+                            model:truckSnapshot.get('model'),
+                            number_of_seats: truckSnapshot.get('number_of_seats'),
+                            number_of_tyres: truckSnapshot.get('number_of_tyres'),
+                            start_work:  truckSnapshot.get('start_work'),
+                            volume: truckSnapshot.get('volume'),
+                            createdAt: FieldValue.serverTimestamp()
+                        }},{merge: true}))
+                    }else{
+                        //remove previous driver
+                        promises.push(truckSnapshot.ref.set({driver: null},{merge: true}))
+                    }
+                    //return respponse 200
+                    return Promise.all(promises).then(()=>{
+                        snapshot.ref.child("response").set({code: 200})
+                        return false
+                    })
+                }else{
+                    snapshot.ref.child("response").set({code: 401})
+                    return false
+                }
+            }).catch((err)=>{
+                snapshot.ref.child("response").set({code: 500})
+                return false
             })
         })
 
@@ -51,29 +140,36 @@ export class TrucksIntent {
             const end_date = new Date(Number.parseInt(truckData.start_date))
             end_date.setFullYear(end_date.getFullYear()+10)
             const truckDoc = {
-                carrying_capacity:  truckData.carrying_capacity,
+                carrying_capacity:  +truckData.carrying_capacity,
                 category: truckData.category,
                 common_name: truckData.common_name,
                 immatriculation: truckData.immatriculation,
                 make_by: truckData.make_by,
                 model: truckData.model,
-                number_of_seats: truckData.number_of_seats,
-                number_of_tyres: truckData.number_of_tyres,
+                number_of_seats: +truckData.number_of_seats,
+                number_of_tyres: +truckData.number_of_tyres,
                 registration_certificate: {
                     rc_number: truckData.rc_number,
                     rc_ssdt_id: truckData.rc_ssdt_id,
-                    start_date:  truckData.start_date,
+                    start_date:  +truckData.start_date,
                     end_date: end_date.getTime(),
                     image: "",
                 },
-                start_work:  truckData.start_work,
+                start_work:  +truckData.start_work,
                 userRef: truckData.userRef,
-                volume: truckData.volume,
-                weight: truckData.weight,
+                volume: +truckData.volume,
+                weight: +truckData.weight,
                 image: "",
+                driver: {},
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
+                isDisabled: false,
                 isDeleted: false
+            }
+            if(truckData.driver_ref!=="N/A"){
+                truckDoc.driver ={
+                    fullName: Trucks.driver.fullName,
+                }
             }
             console.log(truckDoc)
             const uid = truckData.userRef.split("/").pop()
@@ -128,14 +224,30 @@ export class TrucksIntent {
                     }))
                     // remove intention and evently add new response  
                     //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
-                    if(truckData.driver_ref!=="N/A")
+                    if(truckData.driver_ref!=="N/A"){
                         subPromises.push(truckRef.collection('drivers').add({
                             driver_ref: Users.getRef(truckData.driver_ref),
                             amount: 0,
-                            idle: false
+                            idle: false,
+                            createdAt: FieldValue.serverTimestamp()
                         }))
-                    Promise.all(subPromises).then(()=> {
                         
+                        subPromises.push(Trucks.driver.ref.set({truck: {
+                            images: truckRef +"/images",
+                            carrying_capacity:  truckData.carrying_capacity,
+                            category:truckData.category,
+                            common_name:truckData.common_name,
+                            immatriculation:truckData.immatriculation,
+                            make_by:truckData.make_by,
+                            model:truckData.model,
+                            number_of_seats: truckData.number_of_seats,
+                            number_of_tyres: truckData.number_of_tyres,
+                            start_work:  truckData.start_work,
+                            volume: truckData.volume,
+                            createdAt: FieldValue.serverTimestamp()
+                        }},{merge: true}))
+                    }
+                    Promise.all(subPromises).then(()=> {
                         admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
                             .set({code: 201}).then(()=> {
                                 resolve(true) 
@@ -148,6 +260,11 @@ export class TrucksIntent {
                 }).catch((err)=> {
                     reject(err)
                 })
+            }).catch((err)=>{
+                console.log(err)
+                admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`)
+                    .ref.child("response")
+                    .set({code: 500})
             }))
 
             return Promise.all(promises)

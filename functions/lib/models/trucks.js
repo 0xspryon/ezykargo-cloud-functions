@@ -27,6 +27,8 @@ Trucks.isValidTruck = (truck) => __awaiter(this, void 0, void 0, function* () {
     if (truck.driver_ref !== "N/A")
         if (!(yield users_1.Users.refExsits(truck.driver_ref)))
             return 404;
+        else
+            Trucks.driver = users_1.Users.user;
     return true;
 });
 Trucks.isValidTechnicalVisit = (tv) => {

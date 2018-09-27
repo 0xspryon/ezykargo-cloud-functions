@@ -14,3 +14,4 @@ export const listenAddTruckIntent = TrucksIntent.listenAddTruckIntent
 export const listenDeleteTruckIntent = TrucksIntent.listenDeleteTruckIntent
 export const listenAddTechnicalVisitIntent = TrucksIntent.listenAddTechnicalVisitIntent
 export const listenAddInsurranceIntent = TrucksIntent.listenAddInsurranceIntent
+export const listenLinkNewDriverTruckIntent = TrucksIntent.listenLinkNewDriverTruckIntent

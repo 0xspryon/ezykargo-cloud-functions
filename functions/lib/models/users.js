@@ -24,6 +24,8 @@ Users.getDoc = (uid) => __awaiter(this, void 0, void 0, function* () {
 Users.refExsits = (userRef) => __awaiter(this, void 0, void 0, function* () {
     const dataSnapshot = yield admin.firestore().doc(userRef).get();
     const result = dataSnapshot.exists;
+    if (result)
+        Users.user = dataSnapshot.data();
     return result;
 });
 exports.Users = Users;
