@@ -14,4 +14,6 @@ exports.listenDeleteTruckIntent = intent_1.TrucksIntent.listenDeleteTruckIntent;
 exports.listenAddTechnicalVisitIntent = intent_1.TrucksIntent.listenAddTechnicalVisitIntent;
 exports.listenAddInsurranceIntent = intent_1.TrucksIntent.listenAddInsurranceIntent;
 exports.listenLinkNewDriverTruckIntent = intent_1.TrucksIntent.listenLinkNewDriverTruckIntent;
+//freightage management
+exports.listenAddFreightageIntent = intent_1.FreightagesIntent.listenAddFreightageIntent;
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {Auth, TrucksIntent} from "./intent";
+import {Auth, TrucksIntent,FreightagesIntent} from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -15,3 +15,6 @@ export const listenDeleteTruckIntent = TrucksIntent.listenDeleteTruckIntent
 export const listenAddTechnicalVisitIntent = TrucksIntent.listenAddTechnicalVisitIntent
 export const listenAddInsurranceIntent = TrucksIntent.listenAddInsurranceIntent
 export const listenLinkNewDriverTruckIntent = TrucksIntent.listenLinkNewDriverTruckIntent
+
+//freightage management
+export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIntent
