@@ -47,10 +47,10 @@ export class FreightagesIntent {
                 isDisabled: false,
                 isDeleted: false
             }
-            console.log(freightageDoc)
-            const uid = freightageData.userRef.split("/").pop()
-            freightageData.items.forEach(elt => {
-                const item = elt.val()
+            const uid = freightageDoc.userRef.split("/").pop()
+            console.log("ici")
+            Object.keys(freightageData.items).forEach(elt => {
+                const item = freightageData.items[elt]
                 const imagePath = item.imagePath
                 const newImagePath = `/freightages/${uid}/${imagePath.split("/").pop()}`
                 if(freightageDoc.image==="")
@@ -65,27 +65,33 @@ export class FreightagesIntent {
                 })
                 promises.push(File.moveFileFromTo(imagePath,newImagePath))
             });
-            
             const freightageRef = admin.firestore().collection(Freightages.basePath).doc()
-            promises.push( new Promise((resolve, reject) => {
+            promises.push(
                 freightageRef.set(freightageDoc).then(()=> {
-                    admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
-                        .set({code: 201}).then(()=> {
-                            resolve(true) 
-                        }).catch((err)=> {
-                            reject(err)
+                    return admin.firestore().runTransaction(t=>{
+                        console.log("ici")
+                        const refFreightages = admin.firestore().doc(Freightages.bucketPath)
+                        console.log(refFreightages)
+                        console.log("la")
+                        return t.get(refFreightages).then((freightageListSnaphsot)=>{
+                            console.log("ici là")
+                            const count = freightageListSnaphsot.data().freightagesCount + 1
+                            console.log("ici là")
+                            return t.update(refFreightages,{freightagesCount: count})
                         })
-                }).catch((err)=> {
-                    reject(err)
+                    }).then((onfullfilled)=>{
+                        return admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
+                            .set({code: 201})
+                    })
                 })
-            }).catch((err)=>{
+            )
+
+            Promise.all(promises).catch((err)=>{
                 console.log(err)
                 admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`)
                     .ref.child("response")
                     .set({code: 500})
-            }))
-
-            return Promise.all(promises)
+            })
         })
     
 }
