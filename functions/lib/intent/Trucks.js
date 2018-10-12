@@ -55,7 +55,7 @@ TrucksIntent.listenDeleteTruckIntent = functions.database.ref('/intents/delete_t
 - add truck to driver
 - return code 200
 */
-TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/link_new_driver_truck/{timestamp}/{truk_ref}')
+TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{timestamp}/associate_driver/{truk_ref}')
     .onCreate((snapshot, context) => {
     const truckDataSnapshot = snapshot.val();
     return models_1.Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot) => __awaiter(this, void 0, void 0, function* () {
@@ -69,7 +69,8 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/l
         }
         if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
             const promises = [];
-            promises.push(admin.firestore().collection(models_1.Trucks.getRef(context.params.truk_ref + "/drivers"))
+            promises.push(admin.firestore().collection(truckDataSnapshot.truckRef + "/drivers")
+                // promises.push(admin.firestore().collection(Trucks.getRef(context.params.truk_ref+"/drivers"))
                 .where("idle", "==", false)
                 .limit(1)
                 .onSnapshot((driverQuerySnapshot) => {
@@ -90,11 +91,26 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/l
                     createdAt: FieldValue.serverTimestamp()
                 }));
                 //add driver info to truck
-                promises.push(truckSnapshot.ref.set({ driver: {
-                        fullName: models_1.Users.user.fullName,
-                    } }, { merge: true }));
+                promises.push(new Promise((resolve, reject) => {
+                    const firestore = admin.firestore();
+                    firestore.doc(truckDataSnapshot.driverRef).get()
+                        .then(driverDataSnapshot => {
+                        truckSnapshot.ref.set({ driver: {
+                                fullName: driverDataSnapshot.data().fullName,
+                            } }, { merge: true })
+                            .then(() => resolve())
+                            .catch((onrejected) => {
+                            console.log({ onrejected });
+                            reject();
+                        });
+                    })
+                        .catch((onrejected) => {
+                        console.log({ onrejected });
+                        reject();
+                    });
+                }));
                 //add truck info to driver
-                promises.push(models_1.Users.user.ref.set({ truck: {
+                promises.push(admin.firestore().doc(truckDataSnapshot.driverRef).set({ truck: {
                         images: truckSnapshot.ref + "/images",
                         carrying_capacity: truckSnapshot.get('carrying_capacity'),
                         category: truckSnapshot.get('category'),
@@ -123,14 +139,15 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/l
             snapshot.ref.child("response").set({ code: 401 });
             return false;
         }
-    })).catch((err) => {
+    })).catch((association_driver_error_internal_500) => {
+        console.log({ association_driver_error_internal_500 });
         snapshot.ref.child("response").set({ code: 500 });
         return false;
     });
 });
 TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
     .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
-    console.log(snapshot.val());
+    // console.log(snapshot.val())
     if (!snapshot.val())
         return false;
     const ref = context.params.ref;
@@ -226,7 +243,7 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                     return t.update(refTrucks, { trucksCount: count });
                 });
             }));
-            // remove intention and evently add new response  
+            // remove intention and eventualy add new response  
             //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
             if (truckData.driver_ref !== "N/A") {
                 subPromises.push(truckRef.collection('drivers').add({
