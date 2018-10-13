@@ -47,75 +47,109 @@ TrucksIntent.listenDeleteTruckIntent = functions.database.ref('/intents/delete_t
 });
 /*
 @Change driver of one truck
+- verify user at userRef owns the car
 - check if new driver exists
 - get previous driver and set it to idle
 - remove truck from previous driver
-- push new driver
+- push new driver to truck drivers collection
 - add driver info to truck
-- add truck to driver
-- return code 200
+- add truck info to driver
+- return code 201 or an error-code
 */
-TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/link_new_driver_truck/{timestamp}/{truk_ref}')
+TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{timestamp}/associate_driver/{push_id}')
     .onCreate((snapshot, context) => {
-    const truckDataSnapshot = snapshot.val();
-    return models_1.Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot) => __awaiter(this, void 0, void 0, function* () {
+    const newIntentDataSnapshot = snapshot.val();
+    // const firestore = admin.firestore()
+    return models_1.Trucks.getDocByRef(newIntentDataSnapshot.truckRef)
+        .then(truckSnapshot => {
         if (!truckSnapshot.exists) {
             snapshot.ref.child("response").set({ code: 404 });
             return false;
         }
-        if (truckDataSnapshot.driverRef !== "N/A" && !models_1.Users.refExsits(truckDataSnapshot.driverRef)) {
+        if (newIntentDataSnapshot.driverRef !== "N/A" && !models_1.Users.refExsits(newIntentDataSnapshot.driverRef)) {
             snapshot.ref.child("response").set({ code: 404 });
             return false;
         }
-        if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
+        if (truckSnapshot.get('userRef') === newIntentDataSnapshot.userRef) {
             const promises = [];
-            promises.push(admin.firestore().collection(models_1.Trucks.getRef(context.params.truk_ref + "/drivers"))
+            const firestore = admin.firestore();
+            promises.push(admin.firestore().collection(truckSnapshot.ref.path + "/drivers")
+                // promises.push(admin.firestore().collection(Trucks.getRef(context.params.push_id+"/drivers"))
                 .where("idle", "==", false)
                 .limit(1)
-                .onSnapshot((driverQuerySnapshot) => {
+                .get()
+                .then(driverQuerySnapshot => {
                 driverQuerySnapshot.forEach((driverSnapshot) => {
+                    console.log(driverSnapshot.data());
                     promises.push(driverSnapshot.ref.set({ idle: true }, { merge: true }));
-                    //remove truck from driver
-                    promises.push(models_1.Users.getDocByRef(driverSnapshot.data().driverRef).then((driverUserRef) => {
-                        return driverUserRef.ref.set({ truck: null }, { merge: true });
+                    //remove truck from drivernewIntentDataSnapshot.truckRef
+                    promises.push(models_1.Users.getDocByRef(driverSnapshot.data().driver_ref).then((driverDocumentSnapshot) => {
+                        const microPromise = driverDocumentSnapshot.ref.set({ truck: null }, { merge: true });
+                        promises.push(microPromise);
+                        // return microPromise
                     }));
                 });
             }));
-            if (truckDataSnapshot.driverRef !== "N/A") {
-                //add driver inside drivers list
-                promises.push(truckSnapshot.ref.collection("drivers").add({
-                    driver_ref: truckDataSnapshot.driverRef,
-                    amount: 0,
-                    idle: false,
+            // if(newIntentDataSnapshot.driverRef!== "N/A"){
+            //add driver inside drivers list
+            promises.push(truckSnapshot.ref.collection("drivers").add({
+                driver_ref: newIntentDataSnapshot.driverRef,
+                amount: 0,
+                idle: false,
+                createdAt: FieldValue.serverTimestamp()
+            }));
+            //add driver info to truck
+            promises.push(new Promise((resolve, reject) => {
+                firestore.doc(newIntentDataSnapshot.driverRef).get()
+                    .then(driverDataSnapshot => {
+                    let driverCount = 1;
+                    const truckData = truckSnapshot.data();
+                    if (truckData) {
+                        driverCount = truckData.driverCount + 1;
+                    }
+                    truckSnapshot.ref.set({
+                        driver: {
+                            fullName: driverDataSnapshot.data().fullName,
+                        },
+                        driver_ref: newIntentDataSnapshot.driverRef,
+                        hasCurrentDriver: true,
+                        driverCount: driverCount,
+                    }, { merge: true })
+                        .then(() => resolve())
+                        .catch((onrejected) => {
+                        console.log({ onrejected });
+                        reject();
+                    });
+                })
+                    .catch((onrejected) => {
+                    console.log({ onrejected });
+                    reject();
+                });
+            }));
+            //add truck info to driver
+            promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
+                truck: {
+                    images: truckSnapshot.ref + "/images",
+                    carrying_capacity: truckSnapshot.get('carrying_capacity'),
+                    category: truckSnapshot.get('category'),
+                    common_name: truckSnapshot.get('common_name'),
+                    immatriculation: truckSnapshot.get('immatriculation'),
+                    make_by: truckSnapshot.get('make_by'),
+                    model: truckSnapshot.get('model'),
+                    number_of_seats: truckSnapshot.get('number_of_seats'),
+                    number_of_tyres: truckSnapshot.get('number_of_tyres'),
+                    start_work: truckSnapshot.get('start_work'),
+                    volume: truckSnapshot.get('volume'),
                     createdAt: FieldValue.serverTimestamp()
-                }));
-                //add driver info to truck
-                promises.push(truckSnapshot.ref.set({ driver: {
-                        fullName: models_1.Users.user.fullName,
-                    } }, { merge: true }));
-                //add truck info to driver
-                promises.push(models_1.Users.user.ref.set({ truck: {
-                        images: truckSnapshot.ref + "/images",
-                        carrying_capacity: truckSnapshot.get('carrying_capacity'),
-                        category: truckSnapshot.get('category'),
-                        common_name: truckSnapshot.get('common_name'),
-                        immatriculation: truckSnapshot.get('immatriculation'),
-                        make_by: truckSnapshot.get('make_by'),
-                        model: truckSnapshot.get('model'),
-                        number_of_seats: truckSnapshot.get('number_of_seats'),
-                        number_of_tyres: truckSnapshot.get('number_of_tyres'),
-                        start_work: truckSnapshot.get('start_work'),
-                        volume: truckSnapshot.get('volume'),
-                        createdAt: FieldValue.serverTimestamp()
-                    } }, { merge: true }));
-            }
-            else {
-                //remove previous driver
-                promises.push(truckSnapshot.ref.set({ driver: null }, { merge: true }));
-            }
+                }
+            }, { merge: true }));
+            // }else{
+            //remove previous driver
+            promises.push(truckSnapshot.ref.set({ driver: null }, { merge: true }));
+            // }
             //return respponse 200
             return Promise.all(promises).then(() => {
-                snapshot.ref.child("response").set({ code: 200 });
+                snapshot.ref.child("response").set({ code: 201 });
                 return false;
             });
         }
@@ -123,14 +157,83 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/l
             snapshot.ref.child("response").set({ code: 401 });
             return false;
         }
-    })).catch((err) => {
+    }).catch((association_driver_error_internal_500) => {
+        console.log({ association_driver_error_internal_500 });
+        snapshot.ref.child("response").set({ code: 500 });
+        return false;
+    });
+});
+/*
+@dissociate a driver of one truck
+- verify user at userRef owns the car
+- check if driver at driverRef exists
+- get the driver and set it to idle
+- remove truck info from driver
+- remove driver info from truck
+- return code 201 or any appropriate error-code
+*/
+TrucksIntent.listenUnLinkDriverTruckIntent = functions.database.ref('/intents/{timestamp}/dissociate_driver/{push_id}')
+    .onCreate((snapshot, context) => {
+    const dissociateDriverDataSnapshot = snapshot.val();
+    const firestore = admin.firestore();
+    return models_1.Trucks.getDocByRef(dissociateDriverDataSnapshot.truckRef)
+        .then(truckSnapshot => {
+        if (!truckSnapshot.exists) {
+            snapshot.ref.child("response").set({ code: 404 });
+            return false;
+        }
+        return firestore.doc(dissociateDriverDataSnapshot.driverRef).get()
+            .then(driverSnapShot => {
+            if (dissociateDriverDataSnapshot.driverRef !== "N/A" && !driverSnapShot.exists) {
+                snapshot.ref.child("response").set({ code: 404 });
+                return false;
+            }
+            if (truckSnapshot.get('userRef') === dissociateDriverDataSnapshot.userRef) {
+                const promises = [];
+                promises.push(firestore.collection(truckSnapshot.ref.path + "/drivers")
+                    .where("driver_ref", "==", dissociateDriverDataSnapshot.driverRef)
+                    .orderBy('createdAt', 'desc')
+                    .limit(1)
+                    .get()
+                    .then(driverQuerySnapshot => {
+                    driverQuerySnapshot.forEach((driverSnapshot) => {
+                        console.log({ driverSnapshot: driverSnapshot.data() });
+                        promises.push(driverSnapshot.ref.set({ idle: true }, { merge: true }));
+                        promises.push(driverSnapShot.ref.set({ truck: null }, { merge: true }));
+                    });
+                }));
+                promises.push(truckSnapshot.ref.set({ driver: {
+                        fullName: "N/A",
+                    },
+                    driver_ref: "N/A",
+                    hasCurrentDriver: false,
+                    dissociatedAt: FieldValue.serverTimestamp(),
+                }, { merge: true }));
+                console.log('promising and alling');
+                return Promise.all(promises).then(() => {
+                    snapshot.ref.child("response").set({ code: 201 });
+                    return false;
+                })
+                    .catch(err => {
+                    console.log({ err });
+                    snapshot.ref.child("response").set({ code: 500 });
+                    return false;
+                });
+            }
+            else {
+                snapshot.ref.child("response").set({ code: 401 });
+                return false;
+            }
+        });
+    }).catch((association_driver_error_internal_500) => {
+        console.log({ association_driver_error_internal_500 });
         snapshot.ref.child("response").set({ code: 500 });
         return false;
     });
 });
 TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
     .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
-    console.log(snapshot.val());
+    // console.log(snapshot.val())
     if (!snapshot.val())
         return false;
     const ref = context.params.ref;
@@ -226,7 +329,7 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                     return t.update(refTrucks, { trucksCount: count });
                 });
             }));
-            // remove intention and evently add new response  
+            // remove intention and eventualy add new response  
             //subPromises.push(admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
             if (truckData.driver_ref !== "N/A") {
                 subPromises.push(truckRef.collection('drivers').add({
@@ -235,7 +338,8 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                     idle: false,
                     createdAt: FieldValue.serverTimestamp()
                 }));
-                subPromises.push(models_1.Trucks.driver.ref.set({ truck: {
+                subPromises.push(models_1.Trucks.driver.ref.set({
+                    truck: {
                         images: truckRef + "/images",
                         carrying_capacity: truckData.carrying_capacity,
                         category: truckData.category,
@@ -248,7 +352,8 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                         start_work: truckData.start_work,
                         volume: truckData.volume,
                         createdAt: FieldValue.serverTimestamp()
-                    } }, { merge: true }));
+                    }
+                }, { merge: true }));
             }
             Promise.all(subPromises).then(() => {
                 admin.database().ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")

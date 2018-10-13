@@ -48,7 +48,9 @@ Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finishe
         nicBackUrl: NIC_BACK_JPG_PATH,
         avatarUrl: PROFILE_JPG_PATH,
         public: true,
-        timestamp: FieldValue.serverTimestamp()
+        timestamp: FieldValue.serverTimestamp(),
+        average_rating: 0,
+        rating_count: 0,
     };
     console.log(userDoc);
     promises.push(new Promise((resolve, reject) => {
