@@ -11,7 +11,7 @@ export class Trucks {
         return `${Trucks.basePath}${id}`
     }
 
-    static getDocByRef = async (ref)=>{
+    static getDocByRef = (ref)=>{
         return admin.firestore().doc(ref).get()
     }
     static getDoc = async (id)=>{

@@ -9,22 +9,24 @@ export class FreightagesIntent {
 
     static listenAddFreightageIntent = functions.database.ref('/intents/add_freightage/{timestamp}/{ref}/finished')
         .onCreate(async (snapshot,context)=>{
-            console.log(snapshot.val())
-            if(!snapshot.val())
-                return false
+            const intentData = snapshot.val()
+            console.log(intentData)
+            if(!intentData) return false
+
             const ref = context.params.ref
             const timestamp = context.params.timestamp
 
             const freightageDataSnapshot = await admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).once('value')
+
             const freightageData = freightageDataSnapshot.val()
             //check if data is correct
-            const response = await Freightages.isValidFreightage(freightageData) ;
-            if (response !== true){
-                // format response and put into rtdb
-                admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
-                    .set({code: response})
-                return false
-            }
+            // const response = await Freightages.isValidFreightage(freightageData) ;
+            // if (response !== true){
+            //     // format response and put into rtdb
+            //     admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
+            //         .set({code: response})
+            //     return false
+            // }
             //create new freightage doc to store into firestore
             const promises = []
             const freightageDoc = {
@@ -71,7 +73,7 @@ export class FreightagesIntent {
                 freightageRef.set(freightageDoc).then(()=> {
                     admin.database().ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
                         .set({code: 201}).then(()=> {
-                            resolve(true) 
+                            resolve(true)
                         }).catch((err)=> {
                             reject(err)
                         })

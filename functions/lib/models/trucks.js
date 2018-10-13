@@ -17,9 +17,9 @@ Trucks.basePath = `${Trucks.bucketPath}trucks/`;
 Trucks.getRef = (id) => {
     return `${Trucks.basePath}${id}`;
 };
-Trucks.getDocByRef = (ref) => __awaiter(this, void 0, void 0, function* () {
+Trucks.getDocByRef = (ref) => {
     return admin.firestore().doc(ref).get();
-});
+};
 Trucks.getDoc = (id) => __awaiter(this, void 0, void 0, function* () {
     return admin.firestore().doc(Trucks.getRef(id)).get();
 });

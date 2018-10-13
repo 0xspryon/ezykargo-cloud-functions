@@ -1,4 +1,4 @@
-    import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import {Auth, TrucksIntent,FreightagesIntent} from "./intent";
 
@@ -15,6 +15,7 @@ export const listenDeleteTruckIntent = TrucksIntent.listenDeleteTruckIntent
 export const listenAddTechnicalVisitIntent = TrucksIntent.listenAddTechnicalVisitIntent
 export const listenAddInsurranceIntent = TrucksIntent.listenAddInsurranceIntent
 export const listenLinkNewDriverTruckIntent = TrucksIntent.listenLinkNewDriverTruckIntent
+export const listenUnLinkDriverTruckIntent = TrucksIntent.listenUnLinkDriverTruckIntent
 
 //freightage management
 export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIntent
