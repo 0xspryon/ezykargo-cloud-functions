@@ -44,8 +44,14 @@ export class FreightagesIntent {
                 items: [],
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
-                isDisabled: false,
-                isDeleted: false
+                isDeleted: false,
+                onTransit: false,
+                delivered: false,
+                completed: false,
+                idle: false,
+                inBargain: true,
+                pickup: false,
+                relayCount: 0
             }
             const uid = freightageDoc.userRef.split("/").pop()
             console.log("ici")
