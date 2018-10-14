@@ -209,7 +209,7 @@ TrucksIntent.listenUnLinkDriverTruckIntent = functions.database.ref('/intents/{t
                     hasCurrentDriver: false,
                     dissociatedAt: FieldValue.serverTimestamp(),
                 }, { merge: true }));
-                console.log('promising and alling');
+                // console.log('promising and alling')
                 return Promise.all(promises).then(() => {
                     snapshot.ref.child("response").set({ code: 201 });
                     return false;
