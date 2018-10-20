@@ -126,7 +126,7 @@ export class FreightagesIntent {
                 })
 
         }
-        )
+    )
 
 
 }
