@@ -43,6 +43,7 @@ FreightagesIntent.listenAddFreightageIntent = functions.database.ref('/intents/a
             return false;
         }
         const freightageData = freightageDataSnapshot.val();
+        console.log(freightageData);
         //check if data is correct
         // const response = await Freightages.isValidFreightage(freightageData) ;
         // if (response !== true){
