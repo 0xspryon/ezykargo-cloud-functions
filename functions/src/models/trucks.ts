@@ -3,8 +3,9 @@ import {Users} from "./users";
 
 export class Trucks {
     
-    static bucketPath: string = "/bucket/trucksList/";
+    static bucketPath: string = "bucket/trucksList/";
     static basePath: string = `${Trucks.bucketPath}trucks/`;
+    static basePathWithoutTraillingSlash: string = `${Trucks.bucketPath}trucks`;
     static driver;
 
     static getRef = (id) =>{
