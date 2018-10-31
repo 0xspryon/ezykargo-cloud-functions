@@ -42,25 +42,11 @@ export class FreightagesIntent {
                     }
                     const freightageData = freightageDataSnapshot.val()
                     console.log(freightageData)
-                    //check if data is correct
-                    // const response = await Freightages.isValidFreightage(freightageData) ;
-                    // if (response !== true){
-                    //     // format response and put into rtdb
-                    //     realtimeDatabase.ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
-                    //         .set({code: response})
-                    //     return false
-                    // }
 
                     const promises = []
                     const freightageDoc = {
                         ...freightageData,
                         arrival_date: +freightageData.arrival_date,
-                        // arrival_time: freightageData.arrival_time,
-                        // car_pool: freightageData.car_pool,
-                        // description: freightageData.description,
-                        // from: freightageData.from,
-                        // to: freightageData.to,
-                        // userRef: freightageData.userRef,
                         departure_date: +freightageData.departure_date,
                         departure_time: freightageData.departure_time,
                         car_pool_number: (freightageData.car_pool) ? +freightageData.car_pool_number : 0,
