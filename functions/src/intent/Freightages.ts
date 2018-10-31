@@ -68,6 +68,8 @@ export class FreightagesIntent {
                         weight: +freightageData.weight,
                         image: "",
                         items: [],
+                        drivers: [],
+                        bargainers: [],
                         createdAt: FieldValue.serverTimestamp(),
                         updatedAt: FieldValue.serverTimestamp(),
                         isDeleted: false,
