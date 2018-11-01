@@ -6,7 +6,6 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 export class TrucksIntent {
 
-
     static listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
         .onCreate((snapshot, context) => {
             const truckDataSnapshot = snapshot.val()
@@ -243,175 +242,174 @@ export class TrucksIntent {
             let truckDoc;
             const firestore = admin.firestore();
             const db = admin.database();
-             
-            return db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-            .once('value', truckDataSnapshot => {
-                    const truckData = truckDataSnapshot.val()
-                    console.log({truckData})
-                    //check if data is correct
-                    // const response = await Trucks.isValidTruck(truckData);
-                    // if (response !== true) {
-                    //     // format response and put into rtdb
-                    //     db.ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
-                    //         .set({ code: response })
-                    //     return false
-                    // }
-                    //create new truck doc to store into firestore
-                    const promises = []
-                    const end_date = new Date(Number.parseInt(truckData.start_date))
-                    end_date.setFullYear(end_date.getFullYear() + 10)
-                    truckDoc = {
-                        carrying_capacity: +truckData.carrying_capacity,
-                        category: truckData.category,
-                        common_name: truckData.common_name,
-                        immatriculation: truckData.immatriculation,
-                        make_by: truckData.make_by,
-                        hasAValidInsurrance: false,
-                        model: truckData.model,
-                        hasCurrentDriver: false,
-                        hasValidTechnicalVisit: false,
-                        number_of_seats: +truckData.number_of_seats,
-                        number_of_tyres: +truckData.number_of_tyres,
-                        registration_certificate: {
-                            rc_number: truckData.rc_number,
-                            rc_ssdt_id: truckData.rc_ssdt_id,
-                            start_date: +truckData.start_date,
-                            end_date: end_date.getTime(),
-                            image: "",
-                        },
-                        start_work: +truckData.start_work,
-                        userRef: truckData.userRef,
-                        volume: +truckData.volume,
-                        weight: +truckData.weight,
-                        driver: {},
-                        createdAt: FieldValue.serverTimestamp(),
-                        updatedAt: FieldValue.serverTimestamp(),
-                        isDisabled: false,
-                        isDeleted: false
-                    }
-                    if (truckData.driver_ref !== "N/A") {
-                        truckDoc.driver = {
-                            fullName: truckData.driverFullName,
-                            ref: truckData.driver_ref,
+
+            return new Promise((outerPromiseResolve, outerPromiseReject) => {
+                db.ref(`/intents/add_truck/${timestamp}/${ref}`)
+                    .once('value', truckDataSnapshot => {
+                        const truckData = truckDataSnapshot.val()
+                        console.log({ truckData })
+                        const promises = []
+                        const end_date = new Date(Number.parseInt(truckData.start_date))
+                        end_date.setFullYear(end_date.getFullYear() + 10)
+                        truckDoc = {
+                            carrying_capacity: +truckData.carrying_capacity,
+                            category: truckData.category,
+                            common_name: truckData.common_name,
+                            immatriculation: truckData.immatriculation,
+                            make_by: truckData.make_by,
+                            hasAValidInsurrance: false,
+                            model: truckData.model,
+                            hasCurrentDriver: false,
+                            hasValidTechnicalVisit: false,
+                            number_of_seats: +truckData.number_of_seats,
+                            number_of_tyres: +truckData.number_of_tyres,
+                            registration_certificate: {
+                                rc_number: truckData.rc_number,
+                                rc_ssdt_id: truckData.rc_ssdt_id,
+                                start_date: +truckData.start_date,
+                                end_date: end_date.getTime(),
+                                image: "",
+                            },
+                            start_work: +truckData.start_work,
+                            userRef: truckData.userRef,
+                            volume: +truckData.volume,
+                            weight: +truckData.weight,
+                            driver: {},
+                            createdAt: FieldValue.serverTimestamp(),
+                            updatedAt: FieldValue.serverTimestamp(),
+                            isDisabled: false,
+                            isDeleted: false
                         }
-                        truckDoc[`driverCount`] = 1;
-                    }
-                    const uid = truckData.userRef.split("/").pop()
-                    
-                    console.log('saving images now')
+                        if (truckData.driver_ref !== "N/A") {
+                            truckDoc.driver = {
+                                fullName: truckData.driverFullName,
+                                ref: truckData.driver_ref,
+                            }
+                            truckDoc[`driverCount`] = 1;
+                        }
+                        const uid = truckData.userRef.split("/").pop()
 
-                    // move registration certificate image
-                    const ivRcString = truckData.ivRcString
-                    const newIvRcString = `/trucks/${uid}/rc/${ivRcString.split("/").pop()}`
-                    truckDoc.registration_certificate.image = newIvRcString
-                    promises.push(File.moveFileFromTo(ivRcString, newIvRcString))
-                    //moves truck images
-                    const imageCar1 = truckData.imageCar1
-                    const newImageCar1 = `/trucks/${uid}/${imageCar1.split("/").pop()}`
+                        console.log('saving images now')
 
-                    promises.push(File.moveFileFromTo(imageCar1, newImageCar1))
+                        // move registration certificate image
+                        const ivRcString = truckData.ivRcString
+                        const newIvRcString = `/trucks/${uid}/rc/${ivRcString.split("/").pop()}`
+                        truckDoc.registration_certificate.image = newIvRcString
+                        promises.push(File.moveFileFromTo(ivRcString, newIvRcString))
+                        //moves truck images
+                        const imageCar1 = truckData.imageCar1
+                        const newImageCar1 = `/trucks/${uid}/${imageCar1.split("/").pop()}`
 
-                    const imageCar2 = truckData.imageCar2
-                    const newImageCar2 = `/trucks/${uid}/${imageCar2.split("/").pop()}`
-                    promises.push(File.moveFileFromTo(imageCar2, newImageCar2))
+                        promises.push(File.moveFileFromTo(imageCar1, newImageCar1))
 
-                    const imageCar3 = truckData.imageCar3
-                    const newImageCar3 = `/trucks/${uid}/${imageCar3.split("/").pop()}`
-                    promises.push(File.moveFileFromTo(imageCar3, newImageCar3))
+                        const imageCar2 = truckData.imageCar2
+                        const newImageCar2 = `/trucks/${uid}/${imageCar2.split("/").pop()}`
+                        promises.push(File.moveFileFromTo(imageCar2, newImageCar2))
 
-                    const imageCar4 = truckData.imageCar4
-                    const newImageCar4 = `/trucks/${uid}/${imageCar4.split("/").pop()}`
-                    promises.push(File.moveFileFromTo(imageCar4, newImageCar4))
+                        const imageCar3 = truckData.imageCar3
+                        const newImageCar3 = `/trucks/${uid}/${imageCar3.split("/").pop()}`
+                        promises.push(File.moveFileFromTo(imageCar3, newImageCar3))
 
-                    const imageCar5 = truckData.imageCar5
-                    const newImageCar5 = `/trucks/${uid}/${imageCar5.split("/").pop()}`
-                    promises.push(File.moveFileFromTo(imageCar5, newImageCar5))
+                        const imageCar4 = truckData.imageCar4
+                        const newImageCar4 = `/trucks/${uid}/${imageCar4.split("/").pop()}`
+                        promises.push(File.moveFileFromTo(imageCar4, newImageCar4))
 
-                    const imageCar6 = truckData.imageCar6
-                    const newImageCar6 = `/trucks/${uid}/${imageCar6.split("/").pop()}`
-                    promises.push(File.moveFileFromTo(imageCar6, newImageCar6))
+                        const imageCar5 = truckData.imageCar5
+                        const newImageCar5 = `/trucks/${uid}/${imageCar5.split("/").pop()}`
+                        promises.push(File.moveFileFromTo(imageCar5, newImageCar5))
 
-                    truckDoc[`images`] = [newImageCar1, newImageCar2, newImageCar3, newImageCar4, newImageCar5, newImageCar6,]
+                        const imageCar6 = truckData.imageCar6
+                        const newImageCar6 = `/trucks/${uid}/${imageCar6.split("/").pop()}`
+                        promises.push(File.moveFileFromTo(imageCar6, newImageCar6))
 
-                    
-                    promises.push(
-                        new Promise(
-                            (resolve, reject) => {
-                                const truckRefTesting = firestore.collection('bucket/trucksList/trucks').doc();
-                                console.log(truckDoc)
-                                truckRefTesting.set(truckDoc)
-                                    .then(() => {
-                                        console.log({ truckRefTestingPath: truckRefTesting.path })
-                                        const subPromises = []
-                                        subPromises.push(firestore.runTransaction(t => {
-                                            const refTrucks = firestore.doc(Trucks.bucketPath)
-                                            return t.get(refTrucks).then((trucksListSnaphsot) => {
-                                                let trucksCount = 1
-                                                if(trucksListSnaphsot.exists){
-                                                    trucksCount = +trucksListSnaphsot.data().trucksCount + 1
-                                                    return t.update(refTrucks, { trucksCount })
-                                                } else {
-                                                    return t.set(refTrucks, { trucksCount })
-                                                }
-                                            })
-                                        }))
-                                        // remove intention and eventualy add new response  
-                                        //subPromises.push(db.ref(`/intents/add_truck/${timestamp}/${ref}`).remove())
-                                        if (truckData.driver_ref !== "N/A") {
-                                            subPromises.push(truckRefTesting.collection('drivers').add({
-                                                driver_ref: truckData.driver_ref,
-                                                driver_name: truckData.driverFullName,
-                                                amount: 0,
-                                                idle: false,
-                                                createdAt: FieldValue.serverTimestamp()
+                        truckDoc[`images`] = [newImageCar1, newImageCar2, newImageCar3, newImageCar4, newImageCar5, newImageCar6,]
+
+                        promises.push(
+                            new Promise(
+                                (resolve, reject) => {
+                                    const truckRefTesting = firestore.collection('bucket/trucksList/trucks').doc();
+                                    console.log(truckDoc)
+                                    truckRefTesting.set(truckDoc)
+                                        .then(() => {
+                                            console.log({ truckRefTestingPath: truckRefTesting.path })
+                                            const subPromises = []
+                                            subPromises.push(firestore.runTransaction(t => {
+                                                const refTrucks = firestore.doc(Trucks.bucketPath)
+                                                return t.get(refTrucks).then((trucksListSnaphsot) => {
+                                                    let trucksCount = 1
+                                                    if (trucksListSnaphsot.exists) {
+                                                        trucksCount = +trucksListSnaphsot.data().trucksCount + 1
+                                                        return t.update(refTrucks, { trucksCount })
+                                                    } else {
+                                                        return t.set(refTrucks, { trucksCount })
+                                                    }
+                                                })
                                             }))
-
-                                            subPromises.push(firestore.doc(truckData.driver_ref).set({
-                                                truck: {
-                                                    images: [newImageCar1, newImageCar2, newImageCar3, newImageCar4, newImageCar5, newImageCar6,],
-                                                    carrying_capacity: truckData.carrying_capacity,
-                                                    category: truckData.category,
-                                                    common_name: truckData.common_name,
-                                                    immatriculation: truckData.immatriculation,
-                                                    make_by: truckData.make_by,
-                                                    model: truckData.model,
-                                                    number_of_seats: truckData.number_of_seats,
-                                                    number_of_tyres: truckData.number_of_tyres,
-                                                    start_work: truckData.start_work,
-                                                    volume: truckData.volume,
+                                            if (truckData.driver_ref !== "N/A") {
+                                                subPromises.push(truckRefTesting.collection('drivers').add({
+                                                    driver_ref: truckData.driver_ref,
+                                                    driver_name: truckData.driverFullName,
+                                                    amount: 0,
+                                                    idle: false,
                                                     createdAt: FieldValue.serverTimestamp()
-                                                }
-                                            }, { merge: true }))
-                                        }
-                                        Promise.all(subPromises)
-                                            .then(() => {
-                                                db.ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
-                                                    .set({ code: 201 })
+                                                }))
+
+                                                subPromises.push(firestore.doc(truckData.driver_ref).set({
+                                                    truck: {
+                                                        images: [newImageCar1, newImageCar2, newImageCar3, newImageCar4, newImageCar5, newImageCar6,],
+                                                        carrying_capacity: truckData.carrying_capacity,
+                                                        category: truckData.category,
+                                                        common_name: truckData.common_name,
+                                                        immatriculation: truckData.immatriculation,
+                                                        make_by: truckData.make_by,
+                                                        model: truckData.model,
+                                                        number_of_seats: truckData.number_of_seats,
+                                                        number_of_tyres: truckData.number_of_tyres,
+                                                        start_work: truckData.start_work,
+                                                        volume: truckData.volume,
+                                                        createdAt: FieldValue.serverTimestamp()
+                                                    }
+                                                }, { merge: true }))
+                                            }
+                                            Promise.all(subPromises)
+                                                .then(() => {
+                                                    db.ref(`/intents/add_truck/${timestamp}/${ref}`).ref.child("response")
+                                                        .set({ code: 201 })
                                                         .then(() => {
                                                             resolve(true)
                                                             return true;
                                                         })
-                                            })
-                                            .catch((err) => {
-                                                console.log({ err })
-                                                db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-                                                    .ref.child("response")
-                                                    .set({ code: 500 })
-                                                reject(err)
-                                                return false;
-                                            })
-                                    }).catch((errAtTruckRefSettingTesting) => {
-                                        console.log({ errAtTruckRefSettingTesting })
-                                        db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-                                            .ref.child("response")
-                                            .set({ code: 500 })
-                                        reject(errAtTruckRefSettingTesting)
-                                    })
-                            }
+                                                })
+                                                .catch((err) => {
+                                                    console.log({ err })
+                                                    db.ref(`/intents/add_truck/${timestamp}/${ref}`)
+                                                        .ref.child("response")
+                                                        .set({ code: 500 })
+                                                    reject(err)
+                                                    return false;
+                                                })
+                                        }).catch((errAtTruckRefSettingTesting) => {
+                                            console.log({ errAtTruckRefSettingTesting })
+                                            db.ref(`/intents/add_truck/${timestamp}/${ref}`)
+                                                .ref.child("response")
+                                                .set({ code: 500 })
+                                            reject(errAtTruckRefSettingTesting)
+                                        })
+                                }
+                            )
                         )
-                    )
-                    return Promise.all(promises)
-                })
+                        Promise.all(promises)
+                            .then(succ => {
+                                outerPromiseResolve()
+                            })
+                            .catch(errAtFinalPromise => {
+                                console.log({ errAtFinalPromise })
+                                outerPromiseReject()
+                            })
+                    })
+
+            })
+
         })
 
     static listenAddTechnicalVisitIntent = functions.database.ref('/intents/add_technical_visit/{uid}/{ref}/finished')
