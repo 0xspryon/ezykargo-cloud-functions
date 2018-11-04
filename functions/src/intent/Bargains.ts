@@ -4,8 +4,6 @@ import { Freightages } from '../models';
 import { isArray } from 'util';
 
 export class BargainsIntent {
-
-
     
     static listenAddBargainerOnRTDB = functions.database.ref('bargain/{freightageRef}/participants/{userRef}')
         .onCreate(async (snapshot, context) => {
@@ -36,5 +34,43 @@ export class BargainsIntent {
         }
     )
 
+    static listenHireDriversOnRTDB = functions.database.ref('/intents/hire_drivers/{freightageRef}')
+        .onUpdate(async (snapshot, context) => {
+            const firestore = admin.firestore()
+            const realtimeDatabase = admin.database()
+            const freightageRef = context.params.freightageRef
+            const intentData = snapshot.after.val()
+            console.log(intentData)
+            firestore.doc(Freightages.getRef(freightageRef)).get()
+                .then(freightageDataSnapshot => {
+                    const { drivers } = intentData
+                    freightageDataSnapshot.ref.set({
+                        drivers: drivers.map((driver)=>{
+                            return {driverRef: driver.userRef,price: driver.price,idle: true}
+                        }),
+                        driversRefString: drivers.map((driver)=>{
+                            return driver.userRef
+                        }),
+                        idle: true,
+                        inBargain: false,
+                    }, { merge: true })
+                    .then(() => {
+                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                            .set({ code: 201 })
+                    })
+                    .catch((onrejected) => {
+                        console.log("Reject 2", onrejected)
+                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                            .set({ code: 500 })
+                    })
+                })
+                .catch((onrejected) => {
+                    console.log("Reject", onrejected)
+                    realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                        .set({ code: 500 })
+                })
+
+        }
+    )
 
 }

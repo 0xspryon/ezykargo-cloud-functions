@@ -38,5 +38,41 @@ BargainsIntent.listenAddBargainerOnRTDB = functions.database.ref('bargain/{freig
         console.log("Reject", onrejected);
     });
 }));
+BargainsIntent.listenHireDriversOnRTDB = functions.database.ref('/intents/hire_drivers/{freightageRef}')
+    .onUpdate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    const firestore = admin.firestore();
+    const realtimeDatabase = admin.database();
+    const freightageRef = context.params.freightageRef;
+    const intentData = snapshot.after.val();
+    console.log(intentData);
+    firestore.doc(models_1.Freightages.getRef(freightageRef)).get()
+        .then(freightageDataSnapshot => {
+        const { drivers } = intentData;
+        freightageDataSnapshot.ref.set({
+            drivers: drivers.map((driver) => {
+                return { driverRef: driver.userRef, price: driver.price, idle: true };
+            }),
+            driversRefString: drivers.map((driver) => {
+                return driver.userRef;
+            }),
+            idle: true,
+            inBargain: false,
+        }, { merge: true })
+            .then(() => {
+            realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                .set({ code: 201 });
+        })
+            .catch((onrejected) => {
+            console.log("Reject 2", onrejected);
+            realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                .set({ code: 500 });
+        });
+    })
+        .catch((onrejected) => {
+        console.log("Reject", onrejected);
+        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+            .set({ code: 500 });
+    });
+}));
 exports.BargainsIntent = BargainsIntent;
 //# sourceMappingURL=Bargains.js.map
