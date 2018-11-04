@@ -48,27 +48,26 @@ export class BargainsIntent {
                         drivers: drivers.map((driver)=>{
                             return {driverRef: driver.userRef,price: driver.price,idle: true}
                         }),
+                        driversRefString: drivers.map((driver)=>{
+                            return driver.userRef
+                        }),
                         idle: true,
                         inBargain: false,
                     }, { merge: true })
                     .then(() => {
-                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}`).ref.child("response")
-                            .set({ code: 201 }).then(() => {
-                            }).catch((err) => {
-                            })
+                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                            .set({ code: 201 })
                     })
                     .catch((onrejected) => {
                         console.log("Reject 2", onrejected)
-                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}`).ref.child("response")
-                            .set({ code: 500 }).then(() => {
-                            })
+                        realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                            .set({ code: 500 })
                     })
                 })
                 .catch((onrejected) => {
                     console.log("Reject", onrejected)
-                    realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}`).ref.child("response")
-                        .set({ code: 500 }).then(() => {
-                        })
+                    realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                        .set({ code: 500 })
                 })
 
         }
