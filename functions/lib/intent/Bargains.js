@@ -93,12 +93,14 @@ BargainsIntent.listenPostResponseForHireDriver = functions.database.ref('/intent
         let driversRefStrings = freightageData.driversRefString || [];
         let drivers = freightageData.drivers || [];
         //check if driver is inside hired drivers
-        if (!driversRefStrings.some(driversRefString => driversRefString === models_1.Users.getRef(userRef)))
+        if (driversRefStrings.some(driversRefString => models_1.Users.getRef(userRef).indexOf(driversRefString)) === -1) {
             realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                 .set({ code: 401 });
+            return;
+        }
         let selectedBargain;
         drivers = drivers.map((driver) => {
-            if (driver.driverRef === models_1.Users.getRef(userRef)) {
+            if (models_1.Users.getRef(userRef).indexOf(driver.driverRef) !== -1) {
                 driver.idle = false;
                 selectedBargain = driver;
             }
@@ -107,7 +109,7 @@ BargainsIntent.listenPostResponseForHireDriver = functions.database.ref('/intent
         //when user reject request
         if (!accepted) {
             driversRefStrings = driversRefStrings.filter((driver) => {
-                return !(driver.driverRef == models_1.Users.getRef(userRef));
+                return models_1.Users.getRef(userRef).indexOf(driver) === -1;
             });
             freightageDataSnapshot.ref.set({
                 drivers: drivers,
@@ -134,12 +136,13 @@ BargainsIntent.listenPostResponseForHireDriver = functions.database.ref('/intent
                     idle: false,
                     pickup: true,
                     inBargain: false,
+                    amount: selectedBargain.price,
+                    driverRef: selectedBargain.driverRef,
                     truckRef: driverDoc.truck.truckRef,
-                    driverRef: userRef,
                 }, { merge: true })
                     .then(() => {
                     realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                        .set({ code: 200 });
+                        .set({ code: 201 });
                 })
                     .catch((onrejected) => {
                     console.log("Reject 2", onrejected);

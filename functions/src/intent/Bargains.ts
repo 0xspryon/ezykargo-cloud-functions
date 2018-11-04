@@ -93,12 +93,14 @@ export class BargainsIntent {
                 let driversRefStrings =  freightageData.driversRefString || [];
                 let drivers =  freightageData.drivers || [];
                 //check if driver is inside hired drivers
-                if(!driversRefStrings.some(driversRefString=>driversRefString===Users.getRef(userRef)))
+                if(driversRefStrings.some(driversRefString=>Users.getRef(userRef).indexOf(driversRefString))===-1){
                     realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                         .set({ code: 401 })
+                    return;
+                }
                 let selectedBargain;
                 drivers = drivers.map((driver)=>{
-                    if(driver.driverRef===Users.getRef(userRef)){
+                    if(Users.getRef(userRef).indexOf(driver.driverRef)!==-1){
                         driver.idle = false
                         selectedBargain = driver
                     }
@@ -107,7 +109,7 @@ export class BargainsIntent {
                 //when user reject request
                 if(!accepted){
                     driversRefStrings = driversRefStrings.filter((driver)=>{
-                        return !(driver.driverRef==Users.getRef(userRef));
+                        return Users.getRef(userRef).indexOf(driver)===-1;
                     })
                     freightageDataSnapshot.ref.set({
                         drivers: drivers,
@@ -125,32 +127,38 @@ export class BargainsIntent {
                             .set({ code: 500 })
                     })
                 }else{
-                    firestore.doc(Users.getRef(userRef)).get()
-                    .then(userDataSnapshot => {
-                        const driverDoc = userDataSnapshot.data()
-                        freightageDataSnapshot.ref.set({
-                            drivers: drivers,
-                            idle: false,
-                            pickup: true,
-                            inBargain: false,
-                            truckRef: driverDoc.truck.truckRef,
-                            driverRef: userRef,
-                        }, { merge: true })
-                        .then(() => {
-                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                                .set({ code: 200 })
-                        })
-                        .catch((onrejected) => {
-                            console.log("Reject 2", onrejected)
-                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                                .set({ code: 500 })
-                        })
-
+                    firestore.runTransaction(t => {
+                        return t.get(firestore.doc(Users.getRef(userRef)))
+                            .then(userDataSnapshot => {
+                                //check if someone already pickup 
+                                if(freightageData.pickup){
+                                    //realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                    //    .set({ code: 404 })
+                                    Promise.reject("404")
+                                }    
+                                const driverDoc = userDataSnapshot.data()
+                                return freightageDataSnapshot.ref.set({
+                                    drivers: drivers,
+                                    idle: false,
+                                    pickup: true,
+                                    inBargain: false,
+                                    amount: selectedBargain.price,
+                                    driverRef: selectedBargain.driverRef,
+                                    truckRef: driverDoc.truck.truckRef,
+                                }, { merge: true })
+                                .then(() => {
+                                    Promise.resolve("201")
+                                })
+                            })
                     })
-                    .catch((onrejected) => {
-                        console.log("Reject", onrejected)
+                    .then((success) => {
                         realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                            .set({ code: 404 })
+                            .set({ code: 201 })
+                    })
+                    .catch(err => {
+                        console.log("Reject 2", err)
+                        realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 500 })
                     })
                 }
                 
