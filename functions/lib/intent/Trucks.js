@@ -143,6 +143,7 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{
             //add truck info to driver
             promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
                 truck: {
+                    truckRef: truckSnapshot.ref,
                     images: truckSnapshot.ref + "/images",
                     carrying_capacity: truckSnapshot.get('carrying_capacity'),
                     category: truckSnapshot.get('category'),
@@ -375,10 +376,10 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                                 immatriculation: truckData.immatriculation,
                                 make_by: truckData.make_by,
                                 model: truckData.model,
-                                number_of_seats: +truckData.number_of_seats,
-                                number_of_tyres: +truckData.number_of_tyres,
+                                number_of_seats: truckData.number_of_seats,
+                                number_of_tyres: truckData.number_of_tyres,
                                 start_work: truckData.start_work,
-                                volume: +truckData.volume,
+                                volume: truckData.volume,
                                 createdAt: FieldValue.serverTimestamp()
                             }
                         }, { merge: true }));

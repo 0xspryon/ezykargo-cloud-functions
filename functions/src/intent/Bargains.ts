@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { Freightages } from '../models';
+import { Freightages,Users } from '../models';
 import { isArray } from 'util';
 
 export class BargainsIntent {
@@ -35,11 +35,12 @@ export class BargainsIntent {
     )
 
     static listenHireDriversOnRTDB = functions.database.ref('/intents/hire_drivers/{freightageRef}')
-        .onUpdate(async (snapshot, context) => {
+        .onCreate(async (snapshot, context) => {
             const firestore = admin.firestore()
             const realtimeDatabase = admin.database()
             const freightageRef = context.params.freightageRef
-            const intentData = snapshot.after.val()
+            //const intentData = snapshot.after.val()
+            const intentData = snapshot.val()
             console.log(intentData)
             firestore.doc(Freightages.getRef(freightageRef)).get()
                 .then(freightageDataSnapshot => {
@@ -70,10 +71,96 @@ export class BargainsIntent {
                 .catch((onrejected) => {
                     console.log("Reject", onrejected)
                     realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
-                        .set({ code: 500 })
+                        .set({ code: 404 })
                 })
 
         }
     )
+    static listenPostResponseForHireDriver = functions.database.ref('/intents/{timestamp}/accepted_hired_request/{freightageRef}/{userRef}/accepted')
+    .onCreate(async (snapshot, context) => {
+        const firestore = admin.firestore()
+        const realtimeDatabase = admin.database()
+
+        const freightageRef = context.params.freightageRef
+        const userRef = context.params.userRef
+        const timestamp = context.params.timestamp
+
+        const accepted = snapshot.val()
+        console.log(accepted)
+        firestore.doc(Freightages.getRef(freightageRef)).get()
+            .then(freightageDataSnapshot => {
+                const freightageData = freightageDataSnapshot.data()
+                let driversRefStrings =  freightageData.driversRefString || [];
+                let drivers =  freightageData.drivers || [];
+                //check if driver is inside hired drivers
+                if(!driversRefStrings.some(driversRefString=>driversRefString===Users.getRef(userRef)))
+                    realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                        .set({ code: 401 })
+                let selectedBargain;
+                drivers = drivers.map((driver)=>{
+                    if(driver.driverRef===Users.getRef(userRef)){
+                        driver.idle = false
+                        selectedBargain = driver
+                    }
+                    return driver;
+                });
+                //when user reject request
+                if(!accepted){
+                    driversRefStrings = driversRefStrings.filter((driver)=>{
+                        return !(driver.driverRef==Users.getRef(userRef));
+                    })
+                    freightageDataSnapshot.ref.set({
+                        drivers: drivers,
+                        driversRefString: driversRefStrings,
+                        idle: true,
+                        inBargain: false,
+                    }, { merge: true })
+                    .then(() => {
+                        realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 200 })
+                    })
+                    .catch((onrejected) => {
+                        console.log("Error on reject hire", onrejected)
+                        realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 500 })
+                    })
+                }else{
+                    firestore.doc(Users.getRef(userRef)).get()
+                    .then(userDataSnapshot => {
+                        const driverDoc = userDataSnapshot.data()
+                        freightageDataSnapshot.ref.set({
+                            drivers: drivers,
+                            idle: false,
+                            pickup: true,
+                            inBargain: false,
+                            truckRef: driverDoc.truck.truckRef,
+                            driverRef: userRef,
+                        }, { merge: true })
+                        .then(() => {
+                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                .set({ code: 200 })
+                        })
+                        .catch((onrejected) => {
+                            console.log("Reject 2", onrejected)
+                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                .set({ code: 500 })
+                        })
+
+                    })
+                    .catch((onrejected) => {
+                        console.log("Reject", onrejected)
+                        realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 404 })
+                    })
+                }
+                
+            })
+            .catch((onrejected) => {
+                console.log("Reject", onrejected)
+                realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                    .set({ code: 404 })
+            })
+
+    });
 
 }

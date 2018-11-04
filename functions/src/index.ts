@@ -23,3 +23,4 @@ export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIn
 //bargain
 export const listenAddBargainerOnRTDB = BargainsIntent.listenAddBargainerOnRTDB
 export const listenHireDriversOnRTDB = BargainsIntent.listenHireDriversOnRTDB
+export const listenPostResponseForHireDriver = BargainsIntent.listenPostResponseForHireDriver

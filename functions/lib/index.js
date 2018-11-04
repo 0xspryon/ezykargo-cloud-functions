@@ -20,4 +20,5 @@ exports.listenAddFreightageIntent = intent_1.FreightagesIntent.listenAddFreighta
 //bargain
 exports.listenAddBargainerOnRTDB = intent_1.BargainsIntent.listenAddBargainerOnRTDB;
 exports.listenHireDriversOnRTDB = intent_1.BargainsIntent.listenHireDriversOnRTDB;
+exports.listenPostResponseForHireDriver = intent_1.BargainsIntent.listenPostResponseForHireDriver;
 //# sourceMappingURL=index.js.map

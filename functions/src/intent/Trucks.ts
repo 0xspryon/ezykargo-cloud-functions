@@ -139,6 +139,7 @@ export class TrucksIntent {
                         //add truck info to driver
                         promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
                             truck: {
+                                truckRef: truckSnapshot.ref,
                                 images: truckSnapshot.ref + "/images",
                                 carrying_capacity: truckSnapshot.get('carrying_capacity'),
                                 category: truckSnapshot.get('category'),
