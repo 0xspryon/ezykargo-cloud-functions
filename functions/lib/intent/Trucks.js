@@ -17,21 +17,35 @@ class TrucksIntent {
 }
 TrucksIntent.listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
     .onCreate((snapshot, context) => {
+    const firestore = admin.firestore();
     const truckDataSnapshot = snapshot.val();
-    return models_1.Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot) => {
+    return firestore.doc(truckDataSnapshot.truckRefString).get()
+        // Trucks.getDocByRef(truckDataSnapshot.truckRef)
+        .then((truckSnapshot) => {
         if (!truckSnapshot.exists) {
             snapshot.ref.child("response").set({ code: 404 });
             return false;
         }
         if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
-            return truckSnapshot.ref.set({
-                deletedAt: FieldValue.serverTimestamp(), isDeleted: true
+            return truckSnapshot.ref
+                .set({
+                deletedAt: FieldValue.serverTimestamp(),
+                isDeleted: true,
             }, { merge: true })
                 .then(() => {
-                snapshot.ref.child("response").set({ code: 200 });
+                console.log("Set deleted at value");
+                const driver = truckDataSnapshot.driver;
+                if (driver) {
+                    firestore.doc(truckDataSnapshot.driver.ref)
+                        .set({ truck: null }, { merge: true });
+                }
+                console.log("Set truck attribute on driver to null");
+                snapshot.ref.child("response").set({ code: 204 });
+                console.log("set code");
                 return true;
             })
                 .catch((err) => {
+                console.log({ err });
                 snapshot.ref.child("response").set({ code: 500 });
                 return false;
             });
@@ -232,6 +246,17 @@ TrucksIntent.listenUnLinkDriverTruckIntent = functions.database.ref('/intents/{t
         return false;
     });
 });
+/*
+@Creates a new truck
+- fetch the actual car that is to be created from
+    firestore after all images are loaded
+- construct truck instance
+- Asynchronously transfer images to their final destination
+- save truck instance
+- Save truck info to driver if he is associated directly to that car
+- Save response
+- return code 201 or any appropriate error-code
+*/
 TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
     .onCreate((snapshot, context) => {
     // console.log(snapshot.val())
@@ -350,10 +375,10 @@ TrucksIntent.listenAddTruckIntent = functions.database.ref('/intents/add_truck/{
                                 immatriculation: truckData.immatriculation,
                                 make_by: truckData.make_by,
                                 model: truckData.model,
-                                number_of_seats: truckData.number_of_seats,
-                                number_of_tyres: truckData.number_of_tyres,
+                                number_of_seats: +truckData.number_of_seats,
+                                number_of_tyres: +truckData.number_of_tyres,
                                 start_work: truckData.start_work,
-                                volume: truckData.volume,
+                                volume: +truckData.volume,
                                 createdAt: FieldValue.serverTimestamp()
                             }
                         }, { merge: true }));

@@ -21,62 +21,71 @@ class Auth {
 }
 Auth.onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
     .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
-    if (!snapshot.val())
+    const db = admin.database();
+    const firestore = admin.firestore();
+    if (!snapshot.exists())
         return false;
     const auuid = context.params.auuid;
-    const userDataSnapshot = yield admin.database().ref(`/intents/sign_up/${auuid}`).once('value');
-    //move images to correct bucket
-    const promises = [];
-    const nic_front_path = userDataSnapshot.val().NIC_FRONT_JPG.path;
-    const nic_back_path = userDataSnapshot.val().NIC_BACK_JPG.path;
-    const profile_path = userDataSnapshot.val().PROFILE_JPG.path;
-    const NIC_FRONT_PATH = `/users/nic/${auuid}/${nic_front_path.split("/").pop()}`;
-    const NIC_BACK_JPG_PATH = `/users/nic/${auuid}/${nic_back_path.split("/").pop()}`;
-    const PROFILE_JPG_PATH = `/users/avatar/${auuid}/${profile_path.split("/").pop()}`;
-    promises.push(File_1.File.moveFileFromTo(nic_front_path, NIC_FRONT_PATH));
-    promises.push(File_1.File.moveFileFromTo(nic_back_path, NIC_BACK_JPG_PATH));
-    promises.push(File_1.File.moveFileFromTo(profile_path, PROFILE_JPG_PATH));
-    //create new user doc to store into firestore
-    const phonenumber = userDataSnapshot.val().user_info.phonenumber;
-    const momo_provider = userDataSnapshot.val().user_info.momo_provider;
-    const userDoc = {
-        fullName: userDataSnapshot.val().user_info.firstname + " " + userDataSnapshot.val().user_info.other_name,
-        firstName: userDataSnapshot.val().user_info.firstname,
-        nicNumber: userDataSnapshot.val().user_info.nic_number,
-        transaction_pin_code: userDataSnapshot.val().user_info.transaction_code,
-        nicFrontUrl: NIC_FRONT_PATH,
-        nicBackUrl: NIC_BACK_JPG_PATH,
-        avatarUrl: PROFILE_JPG_PATH,
-        public: true,
-        timestamp: FieldValue.serverTimestamp(),
-        average_rating: 0,
-        rating_count: 0,
-    };
-    console.log(userDoc);
-    promises.push(new Promise((resolve, reject) => {
-        const userListDocument = admin.firestore().doc("/bucket/usersList");
-        userListDocument.collection('users').add(userDoc)
-            .then((userRef) => {
-            const doc = userRef.collection('momo_providers').doc();
-            promises.push(doc.set({ momo_provider, phonenumber, refPath: doc.path, authUid: auuid }));
-            promises.push(admin.database().ref(`/users/${auuid}`).set(userRef.path));
-            promises.push(admin.firestore().runTransaction(t => {
-                return t.get(userListDocument)
-                    .then((usersListSnaphsot) => {
-                    if (usersListSnaphsot.exists) {
-                        const data = usersListSnaphsot.data();
-                        const count = data.userCount + 1;
-                        t.update(userListDocument, { userCount: count });
-                    }
-                    reject('UsersListSnapshot exists not');
-                });
+    return new Promise((outerPromiseResolve, outerPromiseReject) => {
+        db.ref(`/intents/sign_up/${auuid}`)
+            .once('value', userDataSnapshot => {
+            //move images to correct bucket
+            const promises = [];
+            const nic_front_path = userDataSnapshot.val().NIC_FRONT_JPG.path;
+            const nic_back_path = userDataSnapshot.val().NIC_BACK_JPG.path;
+            const profile_path = userDataSnapshot.val().PROFILE_JPG.path;
+            const NIC_FRONT_PATH = `/users/nic/${auuid}/${nic_front_path.split("/").pop()}`;
+            const NIC_BACK_JPG_PATH = `/users/nic/${auuid}/${nic_back_path.split("/").pop()}`;
+            const PROFILE_JPG_PATH = `/users/avatar/${auuid}/${profile_path.split("/").pop()}`;
+            promises.push(File_1.File.moveFileFromTo(nic_front_path, NIC_FRONT_PATH));
+            promises.push(File_1.File.moveFileFromTo(nic_back_path, NIC_BACK_JPG_PATH));
+            promises.push(File_1.File.moveFileFromTo(profile_path, PROFILE_JPG_PATH));
+            //create new user doc to store into firestore
+            const phonenumber = userDataSnapshot.val().user_info.phonenumber;
+            const momo_provider = userDataSnapshot.val().user_info.momo_provider;
+            const userDoc = {
+                fullName: userDataSnapshot.val().user_info.firstname + " " + userDataSnapshot.val().user_info.other_name,
+                firstName: userDataSnapshot.val().user_info.firstname,
+                nicNumber: userDataSnapshot.val().user_info.nic_number,
+                transaction_pin_code: userDataSnapshot.val().user_info.transaction_code,
+                nicFrontUrl: NIC_FRONT_PATH,
+                nicBackUrl: NIC_BACK_JPG_PATH,
+                avatarUrl: PROFILE_JPG_PATH,
+                public: true,
+                timestamp: FieldValue.serverTimestamp(),
+                average_rating: 0,
+                rating_count: 0,
+            };
+            console.log(userDoc);
+            promises.push(new Promise((resolve, reject) => {
+                const userListDocument = firestore.doc("/bucket/usersList");
+                userListDocument.collection('users').add(userDoc)
+                    .then((userRef) => {
+                    const doc = userRef.collection('momo_providers').doc();
+                    promises.push(doc.set({ momo_provider, phonenumber, refPath: doc.path, authUid: auuid }));
+                    promises.push(db.ref(`/users/${auuid}`).set(userRef.path));
+                    promises.push(firestore.runTransaction(t => {
+                        return t.get(userListDocument)
+                            .then((usersListSnaphsot) => {
+                            if (usersListSnaphsot.exists) {
+                                const data = usersListSnaphsot.data();
+                                const count = data.userCount + 1;
+                                t.update(userListDocument, { userCount: count });
+                            }
+                            else {
+                                const count = 1;
+                                t.set(userListDocument, { userCount: count });
+                            }
+                        });
+                    }));
+                    resolve("success");
+                })
+                    .catch(err => reject(err));
             }));
-            resolve("success");
-        })
-            .catch(err => reject(err));
-    }));
-    promises.push(admin.database().ref(`/intents/sign_up/${auuid}`).remove());
-    return Promise.all(promises);
+            return Promise.all(promises)
+                .then(() => db.ref(`/intents/sign_up/${auuid}/response/code`).set(201));
+        });
+    });
 }));
 Auth.markPhoneNumberAsUsed = (phoneNumber) => __awaiter(this, void 0, void 0, function* () {
     return admin.firestore().collection("/used_phone_numbers").add({

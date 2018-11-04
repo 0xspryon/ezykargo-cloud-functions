@@ -8,32 +8,50 @@ export class TrucksIntent {
 
     static listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
         .onCreate((snapshot, context) => {
+            const firestore = admin.firestore()
+
             const truckDataSnapshot = snapshot.val()
-            return Trucks.getDocByRef(truckDataSnapshot.truckRef).then((truckSnapshot) => {
-                if (!truckSnapshot.exists) {
-                    snapshot.ref.child("response").set({ code: 404 })
+            return firestore.doc(truckDataSnapshot.truckRefString).get()
+                // Trucks.getDocByRef(truckDataSnapshot.truckRef)
+                .then((truckSnapshot) => {
+                    if (!truckSnapshot.exists) {
+                        snapshot.ref.child("response").set({ code: 404 })
+                        return false
+                    }
+                    if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
+                        return truckSnapshot.ref
+                        .set(
+                            {
+                                deletedAt: FieldValue.serverTimestamp(),
+                                isDeleted: true,
+                            },
+                            { merge: true }
+                        )
+                            .then(() => {
+                                console.log("Set deleted at value")
+                                const driver = truckDataSnapshot.driver
+                                if (driver) {
+                                    firestore.doc(truckDataSnapshot.driver.ref)
+                                        .set({ truck: null }, { merge: true })
+                                }
+                                console.log("Set truck attribute on driver to null")
+                                snapshot.ref.child("response").set({ code: 204 })
+                                console.log("set code")
+                                return true
+                            })
+                            .catch((err) => {
+                                console.log({ err })
+                                snapshot.ref.child("response").set({ code: 500 })
+                                return false
+                            });
+                    } else {
+                        snapshot.ref.child("response").set({ code: 401 })
+                        return false
+                    }
+                }).catch((err) => {
+                    snapshot.ref.child("response").set({ code: 500 })
                     return false
-                }
-                if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
-                    return truckSnapshot.ref.set({
-                        deletedAt: FieldValue.serverTimestamp(), isDeleted: true
-                    }, { merge: true })
-                        .then(() => {
-                            snapshot.ref.child("response").set({ code: 200 })
-                            return true
-                        })
-                        .catch((err) => {
-                            snapshot.ref.child("response").set({ code: 500 })
-                            return false
-                        });
-                } else {
-                    snapshot.ref.child("response").set({ code: 401 })
-                    return false
-                }
-            }).catch((err) => {
-                snapshot.ref.child("response").set({ code: 500 })
-                return false
-            })
+                })
         })
 
     /*
@@ -231,6 +249,17 @@ export class TrucksIntent {
                 })
         })
 
+    /*
+    @Creates a new truck
+    - fetch the actual car that is to be created from 
+        firestore after all images are loaded
+    - construct truck instance
+    - Asynchronously transfer images to their final destination
+    - save truck instance
+    - Save truck info to driver if he is associated directly to that car
+    - Save response
+    - return code 201 or any appropriate error-code
+    */
     static listenAddTruckIntent = functions.database.ref('/intents/add_truck/{timestamp}/{ref}/finished')
         .onCreate((snapshot, context) => {
             // console.log(snapshot.val())
