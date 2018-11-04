@@ -46,7 +46,10 @@ export class BargainsIntent {
                     const { drivers } = intentData
                     freightageDataSnapshot.ref.set({
                         drivers: drivers.map((driver)=>{
-                            return {driverRef: driver.userRef,price: driver.price,idle: true}
+                            return {
+                                driverRef: driver.userRef,price: driver.price,idle: true,
+                                avatarUrl: driver.avatarUrl
+                            }
                         }),
                         driversRefString: drivers.map((driver)=>{
                             return driver.userRef
