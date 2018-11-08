@@ -128,32 +128,37 @@ BargainsIntent.listenPostResponseForHireDriver = functions.database.ref('/intent
             });
         }
         else {
-            firestore.doc(models_1.Users.getRef(userRef)).get()
-                .then(userDataSnapshot => {
-                const driverDoc = userDataSnapshot.data();
-                freightageDataSnapshot.ref.set({
-                    drivers: drivers,
-                    idle: false,
-                    pickup: true,
-                    inBargain: false,
-                    amount: selectedBargain.price,
-                    driverRef: selectedBargain.driverRef,
-                    truckRef: driverDoc.truck.truckRef,
-                }, { merge: true })
-                    .then(() => {
-                    realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                        .set({ code: 201 });
-                })
-                    .catch((onrejected) => {
-                    console.log("Reject 2", onrejected);
-                    realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                        .set({ code: 500 });
+            firestore.runTransaction(t => {
+                return t.get(firestore.doc(models_1.Users.getRef(userRef)))
+                    .then(userDataSnapshot => {
+                    //check if someone already pickup 
+                    if (freightageData.pickup) {
+                        return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 404 });
+                        // Promise.reject("404")
+                    }
+                    else {
+                        const driverDoc = userDataSnapshot.data();
+                        return freightageDataSnapshot.ref.set({
+                            drivers: drivers,
+                            idle: false,
+                            pickup: true,
+                            inBargain: false,
+                            amount: selectedBargain.price,
+                            driverRef: selectedBargain.driverRef,
+                            truckRef: driverDoc.truck.truckRef,
+                        }, { merge: true })
+                            .then(() => {
+                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                .set({ code: 201 });
+                        });
+                    }
                 });
             })
-                .catch((onrejected) => {
-                console.log("Reject", onrejected);
+                .catch(err => {
+                console.log("Reject 2", err);
                 realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                    .set({ code: 404 });
+                    .set({ code: 500 });
             });
         }
     })
