@@ -144,7 +144,7 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{
             promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
                 truck: {
                     truckRef: truckSnapshot.ref,
-                    images: truckSnapshot.ref + "/images",
+                    images: truckSnapshot.get("images"),
                     carrying_capacity: truckSnapshot.get('carrying_capacity'),
                     category: truckSnapshot.get('category'),
                     common_name: truckSnapshot.get('common_name'),
@@ -154,6 +154,8 @@ TrucksIntent.listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{
                     number_of_seats: truckSnapshot.get('number_of_seats'),
                     number_of_tyres: truckSnapshot.get('number_of_tyres'),
                     start_work: truckSnapshot.get('start_work'),
+                    hasAValidInsurrance: truckSnapshot.get('hasAValidInsurrance'),
+                    hasValidTechnicalVisit: truckSnapshot.get('hasValidTechnicalVisit'),
                     volume: truckSnapshot.get('volume'),
                     createdAt: FieldValue.serverTimestamp()
                 }
