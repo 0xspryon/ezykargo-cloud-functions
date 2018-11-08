@@ -17,6 +17,8 @@ exports.listenLinkNewDriverTruckIntent = intent_1.TrucksIntent.listenLinkNewDriv
 exports.listenUnLinkDriverTruckIntent = intent_1.TrucksIntent.listenUnLinkDriverTruckIntent;
 //freightage management
 exports.listenAddFreightageIntent = intent_1.FreightagesIntent.listenAddFreightageIntent;
+exports.listenMarkAsPickup = intent_1.FreightagesIntent.listenMarkAsPickup;
+exports.listenMarkAsDelivered = intent_1.FreightagesIntent.listenMarkAsDelivered;
 //bargain
 exports.listenAddBargainerOnRTDB = intent_1.BargainsIntent.listenAddBargainerOnRTDB;
 exports.listenHireDriversOnRTDB = intent_1.BargainsIntent.listenHireDriversOnRTDB;

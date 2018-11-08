@@ -204,8 +204,8 @@ export class FreightagesIntent {
                             return;
                         }
                         freightageDataSnapshot.ref.set({
-                            onTransit: true,
-                            pickup: false,
+                            onTransit: false,
+                            delivered: true,
                         }, { merge: true })
                         .then(() => {
                             realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref

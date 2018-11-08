@@ -92,5 +92,103 @@ FreightagesIntent.listenAddFreightageIntent = functions.database.ref('/intents/a
         return Promise.all(promises);
     });
 }));
+FreightagesIntent.listenMarkAsPickup = functions.database.ref('/intents/{timestamp}/mark_as_pickup/{ref}')
+    .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    const firestore = admin.firestore();
+    const realtimeDatabase = admin.database();
+    const ref = context.params.ref;
+    const timestamp = context.params.timestamp;
+    const data = snapshot.val();
+    firestore.doc(data["userRef"]).get()
+        .then(userDataSnapshot => {
+        const userData = userDataSnapshot.data();
+        if (userData['transaction_pin_code'] !== "" + data["password"]) {
+            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+                .set({ code: 403 });
+            return;
+        }
+        firestore.doc(data["freightageRef"]).get()
+            .then(freightageDataSnapshot => {
+            const freightageData = freightageDataSnapshot.data();
+            if (freightageData['driverRef'] !== "" + data["userRef"]) {
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+                    .set({ code: 401 });
+                return;
+            }
+            freightageDataSnapshot.ref.set({
+                onTransit: true,
+                pickup: false,
+            }, { merge: true })
+                .then(() => {
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+                    .set({ code: 200 });
+            })
+                .catch((onrejected) => {
+                console.log("Error on reject hire", onrejected);
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+                    .set({ code: 500 });
+            });
+        })
+            .catch((onrejected) => {
+            console.log("Reject", onrejected);
+            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+                .set({ code: 404 });
+        });
+    })
+        .catch((onrejected) => {
+        console.log("Reject", onrejected);
+        realtimeDatabase.ref(`/intents/${timestamp}/mark_as_pickup/${ref}/response`).ref
+            .set({ code: 404 });
+    });
+}));
+FreightagesIntent.listenMarkAsDelivered = functions.database.ref('/intents/{timestamp}/mark_as_delivered/{ref}')
+    .onCreate((snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    const firestore = admin.firestore();
+    const realtimeDatabase = admin.database();
+    const ref = context.params.ref;
+    const timestamp = context.params.timestamp;
+    const data = snapshot.val();
+    firestore.doc(data["userRef"]).get()
+        .then(userDataSnapshot => {
+        const userData = userDataSnapshot.data();
+        if (userData['transaction_pin_code'] !== "" + data["password"]) {
+            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+                .set({ code: 403 });
+            return;
+        }
+        firestore.doc(data["freightageRef"]).get()
+            .then(freightageDataSnapshot => {
+            const freightageData = freightageDataSnapshot.data();
+            if (freightageData['driverRef'] !== "" + data["userRef"]) {
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+                    .set({ code: 401 });
+                return;
+            }
+            freightageDataSnapshot.ref.set({
+                onTransit: false,
+                delivered: true,
+            }, { merge: true })
+                .then(() => {
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+                    .set({ code: 200 });
+            })
+                .catch((onrejected) => {
+                console.log("Error on reject hire", onrejected);
+                realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+                    .set({ code: 500 });
+            });
+        })
+            .catch((onrejected) => {
+            console.log("Reject", onrejected);
+            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+                .set({ code: 404 });
+        });
+    })
+        .catch((onrejected) => {
+        console.log("Reject", onrejected);
+        realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
+            .set({ code: 404 });
+    });
+}));
 exports.FreightagesIntent = FreightagesIntent;
 //# sourceMappingURL=Freightages.js.map
