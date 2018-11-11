@@ -21,6 +21,7 @@ export const listenUnLinkDriverTruckIntent = TrucksIntent.listenUnLinkDriverTruc
 export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIntent
 export const listenMarkAsPickup = FreightagesIntent.listenMarkAsPickup
 export const listenMarkAsDelivered = FreightagesIntent.listenMarkAsDelivered
+export const listenMarkAsCompleted = FreightagesIntent.listenMarkAsCompleted
 
 //bargain
 export const listenAddBargainerOnRTDB = BargainsIntent.listenAddBargainerOnRTDB
