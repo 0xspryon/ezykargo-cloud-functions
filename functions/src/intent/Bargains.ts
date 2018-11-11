@@ -137,6 +137,10 @@ export class BargainsIntent {
                                         // Promise.reject("404")
                                     } else {
                                         const driverDoc = userDataSnapshot.data()
+                                        //check if drivers have a valid truck 
+                                        if(!driverDoc.truck)
+                                            return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                                .set({ code: 403 })
                                         return freightageDataSnapshot.ref.set({
                                             drivers: drivers,
                                             idle: false,
