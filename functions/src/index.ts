@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent} from "./intent";
+import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent} from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -27,3 +27,6 @@ export const listenMarkAsCompleted = FreightagesIntent.listenMarkAsCompleted
 export const listenAddBargainerOnRTDB = BargainsIntent.listenAddBargainerOnRTDB
 export const listenHireDriversOnRTDB = BargainsIntent.listenHireDriversOnRTDB
 export const listenPostResponseForHireDriver = BargainsIntent.listenPostResponseForHireDriver
+
+//users
+export const listenAddReview = UsersIntent.listenAddReview

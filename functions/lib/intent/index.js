@@ -8,4 +8,6 @@ const Bargains_1 = require("./Bargains");
 exports.BargainsIntent = Bargains_1.BargainsIntent;
 const Auth_1 = require("./Auth");
 exports.Auth = Auth_1.Auth;
+const Users_1 = require("./Users");
+exports.UsersIntent = Users_1.UsersIntent;
 //# sourceMappingURL=index.js.map

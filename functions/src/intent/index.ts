@@ -2,5 +2,6 @@ import { FreightagesIntent } from './Freightages';
 import { TrucksIntent } from './Trucks';
 import { BargainsIntent } from './Bargains';
 import {Auth} from "./Auth"
+import {UsersIntent} from "./Users"
 
-export {Auth,TrucksIntent,BargainsIntent,FreightagesIntent}
+export {Auth,UsersIntent,TrucksIntent,BargainsIntent,FreightagesIntent}

@@ -243,50 +243,83 @@ export class FreightagesIntent {
             const data = snapshot.val()
 
 
-            firestore.doc(data["userRef"]).get()
+            return firestore.doc(data["userRef"]).get()
                 .then(userDataSnapshot => {
                 const userData = userDataSnapshot.data()
                 if(userData['transaction_pin_code'] !== ""+ data["password"]){
-                    realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                        .set({ code: 403 })
-                    return;
+                    return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                        .set({ code: 403 });
                 }
-                firestore.doc(data["freightageRef"]).get()
+                return firestore.doc(data["freightageRef"]).get()
                     .then(freightageDataSnapshot => {
                         const freightageData = freightageDataSnapshot.data()
                         
                         if(freightageData['userRef'] !== ""+ data["userRef"]){
-                            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                                .set({ code: 401 })
-                            return;
+                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                                .set({ code: 401 });
                         }
-                        freightageDataSnapshot.ref.set({
+                        return freightageDataSnapshot.ref.set({
                             completed: true,
                             delivered: false,
                             completedAt: FieldValue.serverTimestamp()
                         }, { merge: true })
                         .then(() => {
-                            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                                .set({ code: 200 })
+                            console.log(freightageData)
+                            return firestore.doc(freightageData.driverRef).get()
+                                .then(driverDataSnapshot => {
+                                    const driverData = driverDataSnapshot.data()
+                                    console.log(driverData)
+                                    const userReview = {
+                                        avatarUrl: userData.avatarUrl,
+                                        fullName: userData.fullName,
+                                        average_rating: userData.average_rating,
+                                        departure_date: freightageData.departure_date,
+                                        amount: freightageData.amount,
+                                        from: freightageData.from,
+                                        to: freightageData.to,
+                                        title: freightageData.title,
+                                        freightageRef:data["freightageRef"],
+                                        userId: userDataSnapshot.id
+                                    }
+                                    const driverReview = {
+                                        avatarUrl: driverData.avatarUrl,
+                                        fullName: driverData.fullName,
+                                        average_rating: driverData.average_rating,
+                                        departure_date: freightageData.departure_date,
+                                        amount: freightageData.amount,
+                                        from: freightageData.from,
+                                        to: freightageData.to,
+                                        title: freightageData.title,
+                                        freightageRef:data["freightageRef"],
+                                        userId: driverDataSnapshot.id
+                                    }
+                                    realtimeDatabase.ref(`/reviews/${userDataSnapshot.id}/${timestamp}`).ref
+                                        .set(driverReview)
+                                        .then(() => {
+                                            return realtimeDatabase.ref(`/reviews/${driverDataSnapshot.id}/${timestamp}`).ref
+                                                .set(userReview)
+                                        }).then(() => {
+                                             return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response/code`).ref
+                                                .set(200)
+                                        })
+                                        .catch((onrejected) => {
+                                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                                                .set({ code: 404 })
+                                        })
                         })
                         .catch((onrejected) => {
                             console.log("Error on reject hire", onrejected)
-                            realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
                                 .set({ code: 500 })
                         })
                         
                     })
                     .catch((onrejected) => {
                         console.log("Reject", onrejected)
-                        realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                        return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
                             .set({ code: 404 })
                     })
                 })
-                .catch((onrejected) => {
-                    console.log("Reject", onrejected)
-                    realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                        .set({ code: 404 })
-                })
-
         });
+    });
 }
