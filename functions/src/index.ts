@@ -1,6 +1,9 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent} from "./intent";
+
+import webApi from "./api";
+
+import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent} from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -30,3 +33,9 @@ export const listenPostResponseForHireDriver = BargainsIntent.listenPostResponse
 
 //users
 export const listenAddReview = UsersIntent.listenAddReview
+
+//payment
+export const listenMakePayment = TransactionsIntent.listenMakePayment
+
+//init API
+export const api = webApi;

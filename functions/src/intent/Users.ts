@@ -31,7 +31,7 @@ export class UsersIntent {
                                     console.log(freightageData)
                                     if (data["userRef"].indexOf(freightageData["driverRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["userRef"])) {
                                         //is review for biz
-                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/5;
+                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
                                         return reviewForDataSnapshot.ref
                                             .collection('reviews').doc()
                                             .set({
@@ -45,6 +45,7 @@ export class UsersIntent {
                                                 freightage_ref: data["freightageRef"],
                                                 avatarUrl: userData.avatarUrl,
                                                 fullName: userData.fullName,
+                                                texte: data["reviewText"],
                                                 driver: false,
                                             })
                                             .then(()=>{
@@ -67,7 +68,7 @@ export class UsersIntent {
                                     }
                                     else if(data["userRef"].indexOf(freightageData["userRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["driverRef"])){
                                         //is review for driver
-                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/5;
+                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
                                         return reviewForDataSnapshot.ref
                                             .collection('reviews').doc()
                                             .set({

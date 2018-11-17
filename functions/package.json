@@ -12,8 +12,11 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/storage": "^1.7.0",
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
     "firebase-admin": "^5.12.1",
     "firebase-functions": "^2.0.5",
+    "firebase-functions-helper": "^0.5.10",
     "validator": "^10.6.0"
   },
   "devDependencies": {
