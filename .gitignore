@@ -4,3 +4,5 @@ functions/package-lock\.json
 *.map
 
 *.log
+
+*.js
