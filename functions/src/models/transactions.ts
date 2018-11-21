@@ -4,8 +4,8 @@ export class Transactions {
     
     static bucketPath: string = "/bucket/transactionsList/";
     static basePath: string = `${Transactions.bucketPath}transactions/`;
-
-    static bucketPathMoney: string = "/bucket/moneyAccount/";
+    static moneyAccount: string = `/bucket/moneyAccount`;
+    static bucketPathMoney: string = Transactions.moneyAccount + "/moneyAccounts/";
 
     static getRef = (id) =>{
         return `${Transactions.basePath}${id}`

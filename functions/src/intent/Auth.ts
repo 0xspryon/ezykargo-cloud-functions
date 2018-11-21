@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions';
 import { File } from '../utils/File';
 import { Transactions } from '../models/transactions';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
+import MomoProviders from './../models/MomoProviders'
 
 
 /*
@@ -13,9 +14,9 @@ const FieldValue = require('firebase-admin').firestore.FieldValue;
 export class Auth {
 
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
-        .onCreate( (snapshot, context) => {
+        .onCreate((snapshot, context) => {
             const db = admin.database()
-            const firestore = admin.firestore()
+            const firestoreDb = admin.firestore()
             if (!snapshot.exists())
                 return false
 
@@ -39,12 +40,21 @@ export class Auth {
                     const phonenumber = userData.user_info.phonenumber;
 
                     //@TODO: remember to infer the momo provider from the phonenumber.
-                    const momo_provider = userData.user_info.momo_provider;
+                    let momo_provider = userData.user_info.momo_provider;
+                    switch (momo_provider) {
+                        case 'eum':
+                            momo_provider = MomoProviders.EUM;
+                            break;
+                        default:
+                            momo_provider = MomoProviders.MOMO
+
+                            break;
+                    }
 
                     const userDoc = {
                         fullName: userData.user_info.firstname + " " + userData.user_info.other_name,
                         firstName: userData.user_info.firstname,
-                        other_name: userData.user_info.other_name,
+                        other_names: userData.user_info.other_name,
                         nicNumber: userData.user_info.nic_number,
                         transaction_pin_code: userData.user_info.transaction_code,
                         nicFrontUrl: NIC_FRONT_PATH,
@@ -54,7 +64,6 @@ export class Auth {
                         timestamp: FieldValue.serverTimestamp(),
                         average_rating: 0,
                         rating_count: 0,
-                        // account_balance: 0o0,
                         phonenumber,
                         momoProviders: [
                             { phonenumber, momo_provider },
@@ -62,14 +71,13 @@ export class Auth {
                         ]
                     }
                     console.log(userDoc)
-                    // new Promise((resolve, reject) => {
-                    const userListDocument = firestore.doc("/bucket/usersList")
+                    const userListDocument = firestoreDb.doc("/bucket/usersList")
                     promises.push(
                         userListDocument.collection('users').add(userDoc)
                             .then((userRef) => {
                                 const innerPromise = []
                                 innerPromise.push(
-                                    firestore.runTransaction(t => {
+                                    firestoreDb.runTransaction(t => {
                                         return t.get(userListDocument)
                                             .then((usersListSnaphsot) => {
                                                 if (usersListSnaphsot.exists) {
@@ -83,17 +91,53 @@ export class Auth {
                                             })
                                     })
                                 )
-                                innerPromise.push(() => {
-                                    const userId = userRef.path.split("/").pop()
-                                    userRef.id
-                                    return firestore.doc(Transactions.getRefMoneyAccount(userId))
+                                const referrerRef = userData.user_info.referrerRef
+                                console.log({ referrerRef })
+
+                                if (referrerRef)
+                                    innerPromise.push(
+                                        firestoreDb.collection(`${referrerRef}/referred_ones`)
+                                            .add({ fullName: userDoc.fullName, userRef: userRef.path })
+                                            .then((ref) => {
+                                                console.log({ ref: ref.path })
+                                                return firestoreDb.doc(`${Transactions.getRefMoneyAccount(firestoreDb.doc(referrerRef).id)}`).get()
+                                                    .then(referrerMoneyAccountDataSnapshot => {
+                                                        let referredOnes = 1;
+                                                        if (referrerMoneyAccountDataSnapshot.exists) {
+                                                            referredOnes = +referrerMoneyAccountDataSnapshot.get('referred_ones_count')
+                                                            referredOnes++
+                                                        }
+                                                        return referrerMoneyAccountDataSnapshot.ref.set({ referred_ones_count: referredOnes }, { merge: true })
+                                                    })
+                                            }
+                                            )
+                                            .catch(errOnCollectionAdd => { console.log({ errOnCollectionAdd }) })
+                                    )
+
+                                innerPromise.push(
+                                    firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
                                         .set({
                                             balance: 0,
                                             withdrawCount: 0,
                                             depositCount: 0,
+                                            referred_ones_count: 0,
                                             referalCommissionCount: 0,
+                                            referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
                                         })
-                                })
+                                        .then(() => {
+                                            return firestoreDb.doc(Transactions.moneyAccount).get()
+                                                .then(docSnapshot => {
+                                                    let count = 1
+                                                    if (docSnapshot.exists) {
+                                                        count = +docSnapshot.get('count')
+                                                        count++
+                                                        return docSnapshot.ref.update({ count })
+                                                    }
+                                                    return docSnapshot.ref.set({ count })
+                                                })
+                                        })
+                                        .catch(err => Promise.reject(err))
+                                )
                                 innerPromise.push(
                                     db.ref(`/users/${auuid}`).set(userRef.path)
                                 )
@@ -103,7 +147,6 @@ export class Auth {
                                 return Promise.all(innerPromise)
                             })
                             .catch(err => Promise.reject(err))
-                        // })
                     )
 
                     Promise.all(promises)
