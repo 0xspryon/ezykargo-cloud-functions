@@ -141,18 +141,18 @@ export class TrucksIntent {
                             truck: {
                                 truckRef: truckSnapshot.ref,
                                 images: truckSnapshot.get("images"),
-                                carrying_capacity: truckSnapshot.get('carrying_capacity'),
+                                carrying_capacity: +truckSnapshot.get('carrying_capacity'),
                                 category: truckSnapshot.get('category'),
                                 common_name: truckSnapshot.get('common_name'),
                                 immatriculation: truckSnapshot.get('immatriculation'),
                                 make_by: truckSnapshot.get('make_by'),
                                 model: truckSnapshot.get('model'),
-                                number_of_seats: truckSnapshot.get('number_of_seats'),
-                                number_of_tyres: truckSnapshot.get('number_of_tyres'),
-                                start_work: truckSnapshot.get('start_work'),
+                                number_of_seats: +truckSnapshot.get('number_of_seats'),
+                                number_of_tyres: +truckSnapshot.get('number_of_tyres'),
+                                start_work: +truckSnapshot.get('start_work'),
                                 hasAValidInsurrance: truckSnapshot.get('hasAValidInsurrance'),
                                 hasValidTechnicalVisit: truckSnapshot.get('hasValidTechnicalVisit'),
-                                volume: truckSnapshot.get('volume'),
+                                volume: +truckSnapshot.get('volume'),
                                 createdAt: FieldValue.serverTimestamp()
                             }
                         }, { merge: true }))
@@ -389,16 +389,16 @@ export class TrucksIntent {
                                                 subPromises.push(firestore.doc(truckData.driver_ref).set({
                                                     truck: {
                                                         images: [newImageCar1, newImageCar2, newImageCar3, newImageCar4, newImageCar5, newImageCar6,],
-                                                        carrying_capacity: truckData.carrying_capacity,
+                                                        carrying_capacity: +truckData.carrying_capacity,
                                                         category: truckData.category,
                                                         common_name: truckData.common_name,
                                                         immatriculation: truckData.immatriculation,
                                                         make_by: truckData.make_by,
                                                         model: truckData.model,
-                                                        number_of_seats: truckData.number_of_seats,
-                                                        number_of_tyres: truckData.number_of_tyres,
-                                                        start_work: truckData.start_work,
-                                                        volume: truckData.volume,
+                                                        number_of_seats: +truckData.number_of_seats,
+                                                        number_of_tyres: +truckData.number_of_tyres,
+                                                        start_work: +truckData.start_work,
+                                                        volume: +truckData.volume,
                                                         createdAt: FieldValue.serverTimestamp()
                                                     }
                                                 }, { merge: true }))
