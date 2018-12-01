@@ -47,7 +47,7 @@ export class BargainsIntent {
                     const bargains = intentData.drivers.map((driver)=>{
                         if(driver.pool){
                             driver.drivers = driver.drivers.map((sub_driver)=>{
-                                drivers.push({...sub_driver})
+                                drivers.push({...sub_driver,pool: true})
                                 return {...sub_driver,idle:true}
                             });
                         }else{
