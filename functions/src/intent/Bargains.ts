@@ -39,12 +39,23 @@ export class BargainsIntent {
             const firestore = admin.firestore()
             const realtimeDatabase = admin.database()
             const freightageRef = context.params.freightageRef
-            //const intentData = snapshot.after.val()
             const intentData = snapshot.val()
             console.log(intentData)
             firestore.doc(Freightages.getRef(freightageRef)).get()
                 .then(freightageDataSnapshot => {
-                    const { drivers } = intentData
+                    let drivers  = []
+                    const bargains = intentData.drivers.map((driver)=>{
+                        if(driver.pool){
+                            driver.drivers = driver.drivers.map((sub_driver)=>{
+                                drivers.push({...sub_driver})
+                                return {...sub_driver,idle:true}
+                            });
+                        }else{
+                            driver.idle = true
+                        }
+                        return driver
+                    })
+                    drivers = [...drivers,...intentData.drivers]
                     freightageDataSnapshot.ref.set({
                         drivers: drivers.map((driver) => {
                             return {
@@ -55,6 +66,7 @@ export class BargainsIntent {
                         driversRefString: drivers.map((driver) => {
                             return driver.userRef
                         }),
+                        bargains,
                         idle: true,
                         inBargain: false,
                     }, { merge: true })
@@ -74,8 +86,8 @@ export class BargainsIntent {
                         .set({ code: 404 })
                 })
 
-        }
-        )
+        })
+
     static listenPostResponseForHireDriver = functions.database.ref('/intents/{timestamp}/accepted_hired_request/{freightageRef}/{userRef}/accepted')
         .onCreate(async (snapshot, context) => {
             const firestore = admin.firestore()
