@@ -68,7 +68,14 @@ export class UsersIntent {
                                     }
                                     else if(data["userRef"].indexOf(freightageData["userRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["driverRef"])){
                                         //is review for driver
-                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
+                                        const ratings = [
+                                            +data.transparency,
+                                            +data.friendliness,
+                                            +data.promptness,
+                                            +data.correctness,
+                                        ]
+
+                                        let average = ratings.reduce((a, b) => a+ b , 0)/ratings.length;
                                         return reviewForDataSnapshot.ref
                                             .collection('reviews').doc()
                                             .set({
