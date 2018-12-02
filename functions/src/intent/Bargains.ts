@@ -47,7 +47,7 @@ export class BargainsIntent {
                     const bargains = intentData.drivers.map((driver)=>{
                         if(driver.pool){
                             driver.drivers = driver.drivers.map((sub_driver)=>{
-                                drivers.push({...sub_driver,pool: true})
+                                drivers.push({...sub_driver,price: driver.price,pool: true})
                                 return {...sub_driver,idle:true}
                             });
                         }else{
@@ -57,6 +57,7 @@ export class BargainsIntent {
                     })
                     drivers = [...drivers,...intentData.drivers]
                     freightageDataSnapshot.ref.set({
+                        bargains: bargains,
                         drivers: drivers.map((driver) => {
                             return {
                                 driverRef: driver.userRef, price: driver.price, idle: true,
@@ -66,7 +67,6 @@ export class BargainsIntent {
                         driversRefString: drivers.map((driver) => {
                             return driver.userRef
                         }),
-                        bargains,
                         idle: true,
                         inBargain: false,
                     }, { merge: true })
