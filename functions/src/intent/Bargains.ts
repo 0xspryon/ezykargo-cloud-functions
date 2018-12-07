@@ -69,7 +69,8 @@ export class BargainsIntent {
                             return {
                                 driverRef: driver.userRef, price: driver.price, idle: true,
                                 avatarUrl: driver.avatarUrl,
-                                uniqID: driver.uniqID
+                                uniqID: driver.uniqID,
+                                fullName: driver.fullName
                             }
                         }),
                         driversRefString: drivers.map((driver) => {
@@ -184,7 +185,8 @@ export class BargainsIntent {
                                                                 avatarUrl: driver.avatarUrl,
                                                                 uniqID: bargain.uniqID,
                                                                 truckRef: driverDoc.truck.truckRef,
-                                                                carring_capacity: driver.carring_capacity
+                                                                carring_capacity: driver.carring_capacity,
+                                                                fullName: driver.fullName
                                                             })
                                                         }
                                                         if(Users.getRef(userRef).indexOf(driver.userRef)!==-1){
@@ -197,7 +199,8 @@ export class BargainsIntent {
                                                                     avatarUrl: driver.avatarUrl,
                                                                     uniqID: bargain.uniqID,
                                                                     truckRef: driverDoc.truck.truckRef,
-                                                                    carring_capacity: driver.carring_capacity
+                                                                    carring_capacity: driver.carring_capacity,
+                                                                    fullName: driver.fullName
                                                                 })
                                                             }
                                                         }
@@ -218,7 +221,8 @@ export class BargainsIntent {
                                                         avatarUrl: bargain.avatarUrl,
                                                         uniqID: bargain.uniqID,
                                                         truckRef: driverDoc.truck.truckRef,
-                                                        carring_capacity: bargain.carring_capacity
+                                                        carring_capacity: bargain.carring_capacity,
+                                                        fullName: bargain.fullName
                                                     })
                                                 }
                                             }
@@ -234,6 +238,9 @@ export class BargainsIntent {
                                                 amount: selectedBargain.price,
                                                 bargains,
                                                 drivers: selectedDrivers,
+                                                driversRefString: drivers.map((driver) => {
+                                                    return driver.userRef
+                                                }),
                                             }
                                         }else{
                                             dataToUpdate = {
