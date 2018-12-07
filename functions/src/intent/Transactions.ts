@@ -71,6 +71,8 @@ export class TransactionsIntent {
                         })
                         .catch(error => {
                             console.log(error);
+                            realtimeDatabase.ref(`/intents/make_deposit/${timestamp}/${ref}/response/code`).ref
+                                .set(503)
                         });
                 })
                 .catch((onrejected) => {

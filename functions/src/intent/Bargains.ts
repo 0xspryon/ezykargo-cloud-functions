@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { Freightages, Users } from '../models';
 import { isArray } from 'util';
-
+var crypto = require("crypto")
 export class BargainsIntent {
 
     static listenAddBargainerOnRTDB = functions.database.ref('bargain/{freightageRef}/participants/{userRef}')
@@ -40,28 +40,36 @@ export class BargainsIntent {
             const realtimeDatabase = admin.database()
             const freightageRef = context.params.freightageRef
             const intentData = snapshot.val()
-            console.log(intentData)
+            console.log(intentData.drivers,intentData)
             firestore.doc(Freightages.getRef(freightageRef)).get()
                 .then(freightageDataSnapshot => {
-                    let drivers  = []
-                    const bargains = intentData.drivers.map((driver)=>{
+                    const drivers  = []
+                    const bargains = []
+                    intentData.drivers.map((d)=>{
+                        const driver = d
+                        const uniqID = crypto.randomBytes(16).toString("hex")
+                        driver["uniqID"] = uniqID
                         if(driver.pool){
-                            driver.drivers = driver.drivers.map((sub_driver)=>{
-                                drivers.push({...sub_driver,price: driver.price,pool: true})
-                                return {...sub_driver,idle:true}
+                            driver.drivers = driver.drivers.map((sub_driver,index)=>{
+                                drivers.push({...sub_driver,price: driver.price,userRef: sub_driver.driverRef,pool: true, uniqID:uniqID})
+                                return {...sub_driver,idle:true,userRef: sub_driver.driverRef}
                             });
                         }else{
                             driver.idle = true
+                            drivers.push(driver)
                         }
+                        bargains.push(driver)
                         return driver
                     })
-                    drivers = [...drivers,...intentData.drivers]
+                    //drivers = [...drivers,...intentData.drivers]
                     freightageDataSnapshot.ref.set({
                         bargains: bargains,
                         drivers: drivers.map((driver) => {
+                            console.log(driver)
                             return {
                                 driverRef: driver.userRef, price: driver.price, idle: true,
-                                avatarUrl: driver.avatarUrl
+                                avatarUrl: driver.avatarUrl,
+                                uniqID: driver.uniqID
                             }
                         }),
                         driversRefString: drivers.map((driver) => {
@@ -88,7 +96,7 @@ export class BargainsIntent {
 
         })
 
-    static listenPostResponseForHireDriver = functions.database.ref('/intents/{timestamp}/accepted_hired_request/{freightageRef}/{userRef}/accepted')
+    static listenPostResponseForHireDriver = functions.database.ref('/intents/{timestamp}/accepted_hired_request/{freightageRef}/{userRef}/')
         .onCreate(async (snapshot, context) => {
             const firestore = admin.firestore()
             const realtimeDatabase = admin.database()
@@ -97,8 +105,7 @@ export class BargainsIntent {
             const userRef = context.params.userRef
             const timestamp = context.params.timestamp
 
-            const accepted = snapshot.val()
-            console.log(accepted)
+            const postData = snapshot.val()
             firestore.doc(Freightages.getRef(freightageRef)).get()
                 .then(freightageDataSnapshot => {
                     const freightageData = freightageDataSnapshot.data()
@@ -110,16 +117,20 @@ export class BargainsIntent {
                             .set({ code: 401 })
                         return;
                     }
-                    let selectedBargain;
+                    if(!freightageData.idle){
+                        realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                            .set({ code: 403 })
+                        return;
+                    }
                     drivers = drivers.map((driver) => {
                         if (Users.getRef(userRef).indexOf(driver.driverRef) !== -1) {
-                            driver.idle = false
-                            selectedBargain = driver
+                            if(postData.selectedBargain.indexOf(driver.uniqID) !== -1)
+                                driver.idle = false
                         }
                         return driver;
                     });
                     //when user reject request
-                    if (!accepted) {
+                    if (!postData.accepted) {
                         driversRefStrings = driversRefStrings.filter((driver) => {
                             return Users.getRef(userRef).indexOf(driver) === -1;
                         })
@@ -146,22 +157,92 @@ export class BargainsIntent {
                                     if (freightageData.pickup) {
                                         return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                                             .set({ code: 404 })
-                                        // Promise.reject("404")
                                     } else {
                                         const driverDoc = userDataSnapshot.data()
                                         //check if drivers have a valid truck 
                                         if(!driverDoc.truck)
                                             return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                                                 .set({ code: 403 })
-                                        return freightageDataSnapshot.ref.set({
-                                            drivers: drivers,
-                                            idle: false,
-                                            pickup: true,
-                                            inBargain: false,
-                                            amount: selectedBargain.price,
-                                            driverRef: selectedBargain.driverRef,
-                                            truckRef: driverDoc.truck.truckRef,
-                                        }, { merge: true })
+                                        //check if is pool or simple bargain if is pool make other check
+                                        let bargains = freightageData.bargains || [];
+                                        let selectedBargain;
+                                        let isFinish = false;
+                                        let selectedDrivers = []
+                                        bargains = bargains.map(bargain=>{
+                                            if(isFinish)
+                                                return bargain
+                                            if (postData.selectedBargain.indexOf(bargain.uniqID)!==-1){
+                                                if(bargain.pool){
+                                                    let totalAvailableWeight = 0
+                                                    let myWeight = 0
+                                                    const subSelectedDriver = []
+                                                    bargain.drivers = bargain.drivers.map(driver=>{
+                                                        if(!driver.idle && Users.getRef(userRef).indexOf(driver.userRef) === -1){
+                                                            totalAvailableWeight += driver.carring_capacity
+                                                            subSelectedDriver.push({
+                                                                driverRef: driver.userRef, price: bargain.price,
+                                                                avatarUrl: driver.avatarUrl,
+                                                                uniqID: bargain.uniqID,
+                                                                truckRef: driverDoc.truck.truckRef,
+                                                                carring_capacity: driver.carring_capacity
+                                                            })
+                                                        }
+                                                        if(Users.getRef(userRef).indexOf(driver.userRef)!==-1){
+                                                            driver.truckRef = driverDoc.truck.truckRef
+                                                            if(driver.idle){
+                                                                myWeight = driver.carring_capacity
+                                                                driver.idle = false
+                                                                subSelectedDriver.push({
+                                                                    driverRef: driver.userRef, price: bargain.price,
+                                                                    avatarUrl: driver.avatarUrl,
+                                                                    uniqID: bargain.uniqID,
+                                                                    truckRef: driverDoc.truck.truckRef,
+                                                                    carring_capacity: driver.carring_capacity
+                                                                })
+                                                            }
+                                                        }
+                                                        return driver;
+                                                    })
+                                                    if(totalAvailableWeight>=freightageData.weight){
+                                                        return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                                            .set({ code: 403 })
+                                                    }else if(totalAvailableWeight + myWeight >= freightageData.weight){
+                                                        isFinish = true
+                                                        selectedDrivers = subSelectedDriver
+                                                        selectedBargain = bargain
+                                                    }
+                                                }else{
+                                                    selectedBargain = Object.assign({},bargain)
+                                                    selectedDrivers.push({
+                                                        driverRef: bargain.userRef, price: bargain.price,
+                                                        avatarUrl: bargain.avatarUrl,
+                                                        uniqID: bargain.uniqID,
+                                                        truckRef: driverDoc.truck.truckRef,
+                                                        carring_capacity: bargain.carring_capacity
+                                                    })
+                                                }
+                                            }
+                                            return bargain
+                                        })
+                                        // define new data structure to update
+                                        let dataToUpdate 
+                                        if(isFinish){
+                                            dataToUpdate = {
+                                                pickup: true,
+                                                idle: false, 
+                                                inBargain: false,
+                                                amount: selectedBargain.price,
+                                                bargains,
+                                                drivers: selectedDrivers,
+                                            }
+                                        }else{
+                                            dataToUpdate = {
+                                                bargains,
+                                                drivers
+                                            }
+                                        }
+                                        //update freightage and pass it to pickup and send notification to all user depend on status 
+                                        return freightageDataSnapshot.ref.set(dataToUpdate, { merge: true })
                                             .then(() => {
                                                 realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                                                     .set({ code: 201 })
@@ -169,11 +250,11 @@ export class BargainsIntent {
                                     }
                                 })
                         })
-                            .catch(err => {
-                                console.log("Reject 2", err)
-                                realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
-                                    .set({ code: 500 })
-                            })
+                        .catch(err => {
+                            console.log("Reject 2", err)
+                            realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
+                                .set({ code: 500 })
+                        })
                     }
 
                 })
