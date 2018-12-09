@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { Freightages, Users } from '../models';
 import { isArray } from 'util';
-var crypto = require("crypto")
+const crypto = require("crypto")
 export class BargainsIntent {
 
     static listenAddBargainerOnRTDB = functions.database.ref('bargain/{freightageRef}/participants/{userRef}')
@@ -70,6 +70,7 @@ export class BargainsIntent {
                                 driverRef: driver.userRef, price: driver.price, idle: true,
                                 avatarUrl: driver.avatarUrl,
                                 uniqID: driver.uniqID,
+                                reviews_avg: driver.reviews_avg,
                                 fullName: driver.fullName
                             }
                         }),
@@ -186,6 +187,7 @@ export class BargainsIntent {
                                                                 uniqID: bargain.uniqID,
                                                                 truckRef: driverDoc.truck.truckRef,
                                                                 carring_capacity: driver.carring_capacity,
+                                                                reviews_avg: driver.reviews_avg,
                                                                 fullName: driver.fullName
                                                             })
                                                         }
@@ -200,6 +202,7 @@ export class BargainsIntent {
                                                                     uniqID: bargain.uniqID,
                                                                     truckRef: driverDoc.truck.truckRef,
                                                                     carring_capacity: driver.carring_capacity,
+                                                                    reviews_avg: driver.reviews_avg,
                                                                     fullName: driver.fullName
                                                                 })
                                                             }
@@ -222,12 +225,15 @@ export class BargainsIntent {
                                                         uniqID: bargain.uniqID,
                                                         truckRef: driverDoc.truck.truckRef,
                                                         carring_capacity: bargain.carring_capacity,
+                                                        reviews_avg: bargain.reviews_avg,
                                                         fullName: bargain.fullName
                                                     })
                                                 }
                                             }
                                             return bargain
                                         })
+                                        console.log(selectedBargain)
+                                        console.log(isFinish)
                                         // define new data structure to update
                                         let dataToUpdate 
                                         if(isFinish){
@@ -239,7 +245,7 @@ export class BargainsIntent {
                                                 bargains,
                                                 drivers: selectedDrivers,
                                                 driversRefString: drivers.map((driver) => {
-                                                    return driver.userRef
+                                                    return driver.driverRef
                                                 }),
                                             }
                                         }else{
@@ -248,6 +254,7 @@ export class BargainsIntent {
                                                 drivers
                                             }
                                         }
+                                        console.log(dataToUpdate)
                                         //update freightage and pass it to pickup and send notification to all user depend on status 
                                         return freightageDataSnapshot.ref.set(dataToUpdate, { merge: true })
                                             .then(() => {
