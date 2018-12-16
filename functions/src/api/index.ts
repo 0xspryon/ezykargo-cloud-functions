@@ -8,7 +8,7 @@ const app = express();
 const main = express();
 const axios = require('axios');
 
-export const cloud_function_url_notification = "/notify"
+export const cloud_function_url_notification = "https://us-central1-ezykargo-61790.cloudfunctions.net/api/v1/sE8BFAAE5EEABCA864224363759A55351B0DAA792C03.php"
 export const baseUrl = "https://api.monetbil.com/payment/v1/"
 export const placePayment = baseUrl+"placePayment"
 export const checkPayment = baseUrl+"checkPayment"

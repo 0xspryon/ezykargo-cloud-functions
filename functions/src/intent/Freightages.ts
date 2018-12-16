@@ -196,16 +196,35 @@ export class FreightagesIntent {
                 firestore.doc(data["freightageRef"]).get()
                     .then(freightageDataSnapshot => {
                         const freightageData = freightageDataSnapshot.data()
-                        
-                        if(freightageData['driverRef'] !== ""+ data["userRef"]){
+                        const driverFound = freightageData.drivers.find((driver)=>data["userRef"].indexOf(driver.driverRef)!==-1)
+                        console.log(driverFound)
+                        if(!driverFound){
                             realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
                                 .set({ code: 401 })
                             return;
                         }
-                        freightageDataSnapshot.ref.set({
+                        const supData = {
                             onTransit: false,
+                            deliveredAt: null
+                        }
+
+                        const drivers = freightageData.drivers.map((driver)=>{
+                            if(data["userRef"].indexOf(driver.driverRef)!==-1){
+                                    driver.onTransit = false
+                                    driver.delivery = true
+                            } 
+                            if(!driver.delivery)
+                                supData.onTransit = true
+                            return driver
+                        })
+
+                        if(!supData.onTransit)
+                            supData.deliveredAt = FieldValue.serverTimestamp()
+                        
+                        freightageDataSnapshot.ref.set({
+                            ...supData,
                             delivered: true,
-                            deliveredAt: FieldValue.serverTimestamp()
+                            drivers: drivers,
                         }, { merge: true })
                         .then(() => {
                             realtimeDatabase.ref(`/intents/${timestamp}/mark_as_delivered/${ref}/response`).ref
@@ -232,7 +251,7 @@ export class FreightagesIntent {
 
         });
 
-    static listenMarkAsCompleted = functions.database.ref('/intents/{timestamp}/mark_as_completed/{ref}')
+    static listenMarkAsCompleted = functions.database.ref('/intents//{timestamp}/mark_as_completed/{ref}')
         .onCreate(async (snapshot, context) => {
             const firestore = admin.firestore()
             const realtimeDatabase = admin.database()
@@ -258,61 +277,95 @@ export class FreightagesIntent {
                             return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
                                 .set({ code: 401 });
                         }
-                        return freightageDataSnapshot.ref.set({
-                            completed: true,
+
+                        const driverFound = freightageData.drivers.find((driver)=>data["driverRef"].indexOf(driver.driverRef)!==-1)
+                        console.log(driverFound)
+                        if(!driverFound){
+                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                                .set({ code: 404 })
+                        }
+
+                        const supData = {
                             delivered: false,
-                            completedAt: FieldValue.serverTimestamp()
+                            completedAt: null
+                        }
+
+                        const drivers = freightageData.drivers.map((driver)=>{
+                            if(data["driverRef"].indexOf(driver.driverRef)!==-1){
+                                    driver.completed = true
+                                    driver.delivery = false
+                            } 
+                            if(!driver.completed)
+                                supData.delivered = true
+                            return driver
+                        })
+
+                        if(!supData.delivered)
+                            supData.completedAt = FieldValue.serverTimestamp()
+
+                        return freightageDataSnapshot.ref.set({
+                            ...supData,
+                            completed: true,
+                            drivers: drivers,
                         }, { merge: true })
                         .then(() => {
-                            console.log(freightageData)
-                            return firestore.doc(freightageData.driverRef).get()
-                                .then(driverDataSnapshot => {
-                                    const driverData = driverDataSnapshot.data()
-                                    console.log(driverData)
-                                    const userReview = {
-                                        avatarUrl: userData.avatarUrl,
-                                        fullName: userData.fullName,
-                                        average_rating: userData.average_rating,
-                                        departure_date: freightageData.departure_date,
-                                        amount: freightageData.amount,
-                                        from: freightageData.from,
-                                        to: freightageData.to,
-                                        title: freightageData.title,
-                                        freightageRef:data["freightageRef"],
-                                        userId: userDataSnapshot.id
-                                    }
-                                    const driverReview = {
-                                        avatarUrl: driverData.avatarUrl,
-                                        fullName: driverData.fullName,
-                                        average_rating: driverData.average_rating,
-                                        departure_date: freightageData.departure_date,
-                                        amount: freightageData.amount,
-                                        from: freightageData.from,
-                                        to: freightageData.to,
-                                        title: freightageData.title,
-                                        freightageRef:data["freightageRef"],
-                                        userId: driverDataSnapshot.id
-                                    }
-                                    realtimeDatabase.ref(`/reviews/${userDataSnapshot.id}/${timestamp}`).ref
-                                        .set(driverReview)
-                                        .then(() => {
-                                            return realtimeDatabase.ref(`/reviews/${driverDataSnapshot.id}/${timestamp}`).ref
-                                                .set(userReview)
-                                        }).then(() => {
-                                             return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response/code`).ref
-                                                .set(200)
-                                        })
-                                        .catch((onrejected) => {
-                                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                                                .set({ code: 404 })
-                                        })
-                        })
-                        .catch((onrejected) => {
-                            console.log("Error on reject hire", onrejected)
-                            return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
-                                .set({ code: 500 })
-                        })
-                        
+                            if(!supData.delivered){
+                                const promises = []
+                                freightageData.drivers.forEach((driver)=>{
+                                    promises.push(firestore.doc(driver.driverRef).get()
+                                        .then(driverDataSnapshot => {
+                                            const driverData = driverDataSnapshot.data()
+                                            console.log(driverData)
+                                            const userReview = {
+                                                avatarUrl: userData.avatarUrl,
+                                                fullName: userData.fullName,
+                                                average_rating: userData.average_rating,
+                                                departure_date: freightageData.departure_date,
+                                                amount: freightageData.amount,
+                                                from: freightageData.from,
+                                                to: freightageData.to,
+                                                title: freightageData.title,
+                                                freightageRef:data["freightageRef"],
+                                                userId: userDataSnapshot.id
+                                            }
+                                            const driverReview = {
+                                                avatarUrl: driverData.avatarUrl,
+                                                fullName: driverData.fullName,
+                                                average_rating: driverData.average_rating,
+                                                departure_date: freightageData.departure_date,
+                                                amount: freightageData.amount,
+                                                from: freightageData.from,
+                                                to: freightageData.to,
+                                                title: freightageData.title,
+                                                freightageRef:data["freightageRef"],
+                                                userId: driverDataSnapshot.id
+                                            }
+                                            realtimeDatabase.ref(`/reviews/${userDataSnapshot.id}/${timestamp}`).ref
+                                                .set(driverReview)
+                                                .then(() => {
+                                                    return realtimeDatabase.ref(`/reviews/${driverDataSnapshot.id}/${timestamp}`).ref
+                                                        .set(userReview)
+                                                })
+                                                .catch((onrejected) => {
+                                                    return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                                                        .set({ code: 404 })
+                                                })
+                                            })
+                                    )
+                                })
+                                return Promise.all(promises).then(() => {
+                                    return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response/code`).ref
+                                        .set(200)
+                                })
+                                .catch((onrejected) => {
+                                    console.log("Error on reject hire", onrejected)
+                                    return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response`).ref
+                                        .set({ code: 500 })
+                                })                       
+                            }else{
+                                return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response/code`).ref
+                                .set(200)
+                            }
                     })
                     .catch((onrejected) => {
                         console.log("Reject", onrejected)

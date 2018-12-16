@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 
 import webApi from "./api";
 
-import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent} from "./intent";
+import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent,PickupsIntent} from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -25,7 +25,7 @@ export const listenUnLinkDriverTruckIntent = TrucksIntent.listenUnLinkDriverTruc
 
 //freightage management
 export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIntent
-export const listenMarkAsPickup = FreightagesIntent.listenMarkAsPickup
+//export const listenMarkAsPickup = FreightagesIntent.listenMarkAsPickup
 export const listenMarkAsDelivered = FreightagesIntent.listenMarkAsDelivered
 export const listenMarkAsCompleted = FreightagesIntent.listenMarkAsCompleted
 
@@ -33,6 +33,10 @@ export const listenMarkAsCompleted = FreightagesIntent.listenMarkAsCompleted
 export const listenAddBargainerOnRTDB = BargainsIntent.listenAddBargainerOnRTDB
 export const listenHireDriversOnRTDB = BargainsIntent.listenHireDriversOnRTDB
 export const listenPostResponseForHireDriver = BargainsIntent.listenPostResponseForHireDriver
+
+//Pickups
+export const listenMarkAsPickup = PickupsIntent.listenMarkAsPickup
+export const listenValidatePickup = PickupsIntent.listenValidatePickup
 
 //users
 export const listenAddReview = UsersIntent.listenAddReview
