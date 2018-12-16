@@ -4,6 +4,12 @@ import { File } from '../utils/File';
 import { Transactions } from '../models/transactions';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 import MomoProviders from './../models/MomoProviders'
+import { PhonenumberUtils } from '../utils/PhonenumberUtils';
+import { MobileMoneyProviders } from '../models/MobileMoneyProviders';
+import { ChangePrincipalPhonenumber } from '../models/intents/ChangePrincipalPhonenumber';
+import { DeleteAccount } from '../models/intents/DeleteAccount';
+import { CryptoUtils } from '../utils/CryptoUtils';
+import { UpdateProfileImage } from '../models/intents/UpdateProfileImage';
 
 
 /*
@@ -12,6 +18,7 @@ import MomoProviders from './../models/MomoProviders'
 *
 */
 export class Auth {
+    static FORBIDDEN = 403;
 
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
         .onCreate((snapshot, context) => {
@@ -42,7 +49,7 @@ export class Auth {
                     //@TODO: remember to infer the momo provider from the phonenumber.
                     let momo_provider = userData.user_info.momo_provider;
                     switch (momo_provider) {
-                        case 'eum':
+                        case 'EU_CM':
                             momo_provider = MomoProviders.EUM;
                             break;
                         default:
@@ -61,7 +68,7 @@ export class Auth {
                         nicBackUrl: NIC_BACK_JPG_PATH,
                         avatarUrl: PROFILE_JPG_PATH,
                         public: true,
-                        timestamp: FieldValue.serverTimestamp(),
+                        timestamp: admin.firestore.FieldValue.serverTimestamp(),
                         average_rating: 0,
                         rating_count: 0,
                         phonenumber,
@@ -170,40 +177,129 @@ export class Auth {
             phoneNumber: phoneNumber
         });
     }
-    static onAssociateMomoNumberIntent = functions.database.ref('intents/associate_phonenumber/{timestamp_midnight_today}/{newRef}')
+
+    static addWithdrawalPhonenumber = functions.database.ref('intents/add_withdrawal_phonenumber/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const firestoreDb = admin.firestore();
+            const intent = snapshot.val() as AddwithdrawalPhonenumber
+
+            return firestoreDb.doc(intent.userRef).get()
+                .then(userdoc => {
+                    const { momoProviders } = userdoc.data();
+                    if (momoProviders.lenght > 3) {
+                        return snapshot.ref.child('response')
+                            .set({ code: +Auth.FORBIDDEN })
+                    }
+                    const momo_provider = intent.momo_provider = MobileMoneyProviders.EUM ? intent.momo_provider : PhonenumberUtils.getMomoProviderFromNumber(intent.phonenumber)
+
+                    if (!momo_provider) return snapshot.ref.child('response').set({ code: 404 })
+
+                    momoProviders.push({
+                        momo_provider: PhonenumberUtils.getMomoProviderFromNumber(intent.phonenumber),
+                        phonenumber: `${intent.phonenumber}`,
+                        // rather using the time given by the client here because
+                        // arrays can't have as direct children arrays on firestore
+                        // and the firebase.firestore.fieldValue.serverTimeStamp seem to be an array.
+                        createdAt: +intent.createdAtDateTimeMillis
+                    })
+
+                    return userdoc.ref.set({ ...userdoc.data(), momoProviders })
+                        .then(() => snapshot.ref.child('response').set({ code: 201 }))
+                        .catch(() => snapshot.ref.child('response').set({ code: 500 }))
+
+                })
+        })
+
+    static deleteWithdrawalPhonenumber = functions.database.ref('intents/delete_withdrawal_phonenumber/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const firestoreDb = admin.firestore();
+            const intent = snapshot.val() as AddwithdrawalPhonenumber
+
+            return firestoreDb.doc(intent.userRef).get()
+                .then(userdoc => {
+                    const { momoProviders } = userdoc.data();
+                    if (momoProviders.lenght === 1) {
+                        return snapshot.ref.child('response')
+                            .set({ code: +Auth.FORBIDDEN })
+                    }
+
+                    const index = momoProviders.findIndex(momoProvider => momoProvider.phonenumber === intent.phonenumber)
+                    momoProviders.splice(index, 1)
+
+                    return userdoc.ref.set({ ...userdoc.data(), momoProviders })
+                        .then(() => snapshot.ref.child('response').set({ code: 200 }))
+                        .catch(() => snapshot.ref.child('response').set({ code: 500 }))
+
+                })
+        })
+
+    static changePrincipalPhonenumber = functions.database.ref('intents/change_principal_phonenumber_intent/{timestamp_midnight_today}/{newRef}')
         .onCreate((snapshot) => {
             const db = admin.database();
-            const promises: Promise<any>[] = [];
-            const intent = snapshot.val() as AssociatePhonenumber
+            const firestoreDb = admin.firestore();
+            const intent = snapshot.val() as ChangePrincipalPhonenumber
 
-            if (intent.new_uid === intent.current_uid) return snapshot.ref.child("response").set({ code: 201 })
+            if (intent.newUuid === intent.previousUuid) return snapshot.ref.child("response").set({ code: 201 })
 
-            return Auth.verifyUserDoesNotExistInDb(intent.new_uid)
-                .then(result => {
-                    return db.ref(`users/${intent.current_uid}`)
-                        .once('value', data => {
-                            const firestoreRefPathString: string = data.val();
-                            const doc = admin.firestore().doc(`${firestoreRefPathString}`).collection(`/momo_providers`).doc();
-                            promises.push(
-                                doc.set({ momo_provider: intent.momo_provider, phonenumber: intent.new_uid_phonenumber, refPath: doc.path, authUid: intent.new_uid })
-                            )
+            return firestoreDb.doc(intent.userRef).get()
+                .then(userDoc => new Promise((resolve, reject) => {
+                    const { phonenumber } = userDoc.data();
+                    if (phonenumber === intent.previousPhonenumber) {
+                        const promisses = [];
+                        const promise1 = userDoc.ref.set({ phonenumber: intent.newPhonenumber }, { merge: true })
+                        const promise2 = db.ref(intent.previousUuid).remove()
+                        const promise3 = db.ref(intent.newUuid).set(userDoc.ref.path)
 
-                            promises.push(
-                                db.ref(`users/${intent.new_uid}`).set(firestoreRefPathString)
-                                    .then(val => {
-                                        snapshot.ref.child("response")
-                                            .set({ code: 201 })
-                                    })
-                                    .catch(err => { console.log(`Error writting ressource at "users/${intent.new_uid}"`) })
-                            )
-                            return Promise.all(promises);
+                        promisses.push(promise1, promise2, promise3)
+                        return Promise.all(promisses)
+                            .then(() => {
+                                snapshot.ref.child('response').set({ code: 200 })
+                                    .then(() => resolve())
+                            })
+                            .catch(() => {
+                                snapshot.ref.child('response').set({ code: 500 })
+                                    .then(() => reject())
+                            })
+
+                    } else {
+                        return snapshot.ref.child('response').set({ code: +Auth.FORBIDDEN })
+                    }
+                }))
+        })
+
+    static updateProfileImage = functions.database.ref('intents/change_profile_image/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const db = admin.database().ref();
+            const firestoreDb = admin.firestore();
+            const intent = snapshot.val() as UpdateProfileImage
+
+            return firestoreDb.doc(intent.userRef).get()
+                .then(userDoc => new Promise((resolve, reject) => {
+                    const userData = userDoc.data()
+                    const { avatarUrl } = userData;
+                    let splits = avatarUrl.split('/')
+                    splits.splice(splits.length -1, 1)
+                    splits.push(`${intent.imageStorageRef.split('/').pop()}`)
+                    const newImagePath = `${splits.join('/')}`
+                    const promise1 = File.moveFileFromTo(intent.imageStorageRef, newImagePath)
+                    const promise2 = userDoc.ref.set({ avatarUrl: newImagePath }, { merge: true })
+                    const deletedProfileImageRef = db.child("trash/deleted_profile_images").push()
+                    const promise3 = deletedProfileImageRef.set({
+                        userRef: intent.userRef,
+                        avatarUrl,
+                        deletedAt: admin.firestore.FieldValue.serverTimestamp()
+                    })
+                    Promise.all([promise1, promise2, promise3])
+                        .then(() => {
+                            snapshot.ref.child('response').set({code: 200})
+                            resolve()
                         })
-                })
-                .catch(err => {
-                    snapshot.ref.child("response")
-                        .set({ code: 409 })
-                })
+                        .catch(() => {
+                            snapshot.ref.child('response').set({code: 500})
+                            reject()
+                        })
 
+                }))
         })
 
     static verifyUserDoesNotExistInDb = (uuid: string) => {
@@ -221,7 +317,7 @@ export class Auth {
         });
     }
 
-    static onDeleteMomoProviderIntent = functions.database.ref('intents/delete_momo_provider/{timestamp_midnight_today}/{newRef}')
+    static deletewithdrawalPhonenumber = functions.database.ref('intents/delete_account/{timestamp_midnight_today}/{newRef}')
         .onCreate((snapshot) => {
             const intent = snapshot.val() as DeleteMomoProvider
 
@@ -230,6 +326,48 @@ export class Auth {
             const firebaseDbRef = admin.database().ref(`users/${intent.auth_uid}`);
             const promises: Promise<any>[] = [doc.delete(), firebaseDbRef.remove(), snapshot.ref.remove()];
             return Promise.all(promises);
+        });
+
+    static onDeleteAccount = functions.database.ref('intents/delete_account/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const intent = snapshot.val() as DeleteAccount
+            const firestoreDb = admin.firestore()
+            const db = admin.database().ref()
+
+            return firestoreDb.doc(intent.userRef).get()
+                .then(async userSnapshot => {
+                    const userData = userSnapshot.data()
+                    const encryptedTransactionCode = await CryptoUtils.encrypt(intent.transactionCode, 'secret_key_here')
+
+                    // .then(encryptedTransactionCode => {
+                    if (encryptedTransactionCode === userData.transactionCode) {
+                        const promisses = [];
+                        const promise1 = userSnapshot.ref.set(
+                            {
+                                isDeleted: true,
+                                deletedAt: admin.firestore.FieldValue.serverTimestamp()
+                            },
+                            { merge: true }
+                        )
+                        const promise2 = db.child(intent.auuid).remove()
+                        promisses.push(promise1, promise2)
+                        return new Promise((resolve, reject) => {
+                            Promise.all(promisses)
+                                .then(() => {
+                                    snapshot.ref.child('response').set({ code: 200 })
+                                        .then(() => resolve())
+                                    resolve()
+                                })
+                                .catch(() => {
+                                    snapshot.ref.child('response').set({ code: 500 })
+                                        .then(() => reject())
+                                })
+
+                        })
+                    }
+                    return snapshot.ref.child('response').set({ code: 401 })
+                    // })
+                })
         });
 
 

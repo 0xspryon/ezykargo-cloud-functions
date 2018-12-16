@@ -9,8 +9,11 @@ import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,Transact
 admin.initializeApp(functions.config().firebase);
 
 export const onSignUpComplete = Auth.onSignUpComplete
-export const onAssociateMomoNumberIntent = Auth.onAssociateMomoNumberIntent
-export const onDeleteMomoProviderIntent = Auth.onDeleteMomoProviderIntent
+export const onAssociateMomoNumberIntent = Auth.addWithdrawalPhonenumber
+export const onChangePrincipalPhonenumber = Auth.changePrincipalPhonenumber
+export const onDeleteWithdrawalPhonenumber = Auth.deleteWithdrawalPhonenumber
+export const onDeleteMomoProviderIntent = Auth.onDeleteAccount
+export const onUpdateProfileImage = Auth.updateProfileImage
 
 //trucks management
 export const listenAddTruckIntent = TrucksIntent.listenAddTruckIntent
