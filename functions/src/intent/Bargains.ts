@@ -61,17 +61,38 @@ export class BargainsIntent {
                         bargains.push(driver)
                         return driver
                     })
-                    //drivers = [...drivers,...intentData.drivers]
+                    console.log({
+                        bargains: bargains,
+                        drivers: drivers.map((driver) => {
+                            console.log(driver)
+                            return {
+                                driverRef: driver.userRef, 
+                                price: driver.price, 
+                                idle: true,
+                                avatarUrl: driver.avatarUrl,
+                                uniqID: driver.uniqID,
+                                reviews_avg: driver.reviews_avg,
+                                fullName: driver.name || driver.fullName
+                            }
+                        }),
+                        driversRefString: drivers.map((driver) => {
+                            return driver.userRef
+                        }),
+                        idle: true,
+                        inBargain: false,
+                    })
                     freightageDataSnapshot.ref.set({
                         bargains: bargains,
                         drivers: drivers.map((driver) => {
                             console.log(driver)
                             return {
-                                driverRef: driver.userRef, price: driver.price, idle: true,
+                                driverRef: driver.userRef, 
+                                price: driver.price, 
+                                idle: true,
                                 avatarUrl: driver.avatarUrl,
                                 uniqID: driver.uniqID,
                                 reviews_avg: driver.reviews_avg,
-                                fullName: driver.fullName
+                                fullName: driver.name || driver.fullName
                             }
                         }),
                         driversRefString: drivers.map((driver) => {
@@ -161,6 +182,7 @@ export class BargainsIntent {
                                             .set({ code: 404 })
                                     } else {
                                         const driverDoc = userDataSnapshot.data()
+                                        console.log(driverDoc.truck)
                                         //check if drivers have a valid truck 
                                         if(!driverDoc.truck)
                                             return realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
@@ -188,7 +210,7 @@ export class BargainsIntent {
                                                                 truckRef: driverDoc.truck.truckRef,
                                                                 carring_capacity: driver.carring_capacity,
                                                                 reviews_avg: driver.reviews_avg,
-                                                                fullName: driver.fullName
+                                                                fullName: driver.name || driver.fullName
                                                             })
                                                         }
                                                         if(Users.getRef(userRef).indexOf(driver.userRef)!==-1){
@@ -201,9 +223,10 @@ export class BargainsIntent {
                                                                     avatarUrl: driver.avatarUrl,
                                                                     uniqID: bargain.uniqID,
                                                                     truckRef: driverDoc.truck.truckRef,
-                                                                    carring_capacity: driver.carring_capacity,
+                                                                    carring_capacity: driverDoc.truck.carring_capacity,
+                                                                    carrying_capacity: driverDoc.truck.carrying_capacity,
                                                                     reviews_avg: driver.reviews_avg,
-                                                                    fullName: driver.fullName
+                                                                    fullName: driver.name || driver.fullName
                                                                 })
                                                             }
                                                         }
@@ -218,15 +241,17 @@ export class BargainsIntent {
                                                         selectedBargain = bargain
                                                     }
                                                 }else{
+                                                    isFinish = true
                                                     selectedBargain = Object.assign({},bargain)
                                                     selectedDrivers.push({
                                                         driverRef: bargain.userRef, price: bargain.price,
                                                         avatarUrl: bargain.avatarUrl,
                                                         uniqID: bargain.uniqID,
                                                         truckRef: driverDoc.truck.truckRef,
-                                                        carring_capacity: bargain.carring_capacity,
+                                                        carring_capacity: driverDoc.truck.carrying_capacity,
+                                                        carrying_capacity: driverDoc.truck.carrying_capacity,
                                                         reviews_avg: bargain.reviews_avg,
-                                                        fullName: bargain.fullName
+                                                        fullName: bargain.name || bargain.fullName
                                                     })
                                                 }
                                             }
