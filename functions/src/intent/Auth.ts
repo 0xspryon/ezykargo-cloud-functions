@@ -10,6 +10,7 @@ import { ChangePrincipalPhonenumber } from '../models/intents/ChangePrincipalPho
 import { DeleteAccount } from '../models/intents/DeleteAccount';
 import { CryptoUtils } from '../utils/CryptoUtils';
 import { UpdateProfileImage } from '../models/intents/UpdateProfileImage';
+import { UpdateTransactionCode } from '../models/intents/UpdateTransactionCode';
 
 
 /*
@@ -19,6 +20,8 @@ import { UpdateProfileImage } from '../models/intents/UpdateProfileImage';
 */
 export class Auth {
     static FORBIDDEN = 403;
+    static CONFLICT = 409;
+    static UNPROCESSABLE_ENTITY = 422;
 
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
         .onCreate((snapshot, context) => {
@@ -49,11 +52,11 @@ export class Auth {
                     //@TODO: remember to infer the momo provider from the phonenumber.
                     let momo_provider = userData.user_info.momo_provider;
                     switch (momo_provider) {
-                        case 'EU_CM':
+                        case 'eum':
                             momo_provider = MomoProviders.EUM;
                             break;
                         default:
-                            momo_provider = MomoProviders.MOMO
+                            momo_provider = PhonenumberUtils.getMomoProviderFromNumber(userData.user_info.phonenumber)
 
                             break;
                     }
@@ -68,7 +71,7 @@ export class Auth {
                         nicBackUrl: NIC_BACK_JPG_PATH,
                         avatarUrl: PROFILE_JPG_PATH,
                         public: true,
-                        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                        timestamp: FieldValue.serverTimestamp(),
                         average_rating: 0,
                         rating_count: 0,
                         phonenumber,
@@ -190,13 +193,23 @@ export class Auth {
                         return snapshot.ref.child('response')
                             .set({ code: +Auth.FORBIDDEN })
                     }
-                    const momo_provider = intent.momo_provider = MobileMoneyProviders.EUM ? intent.momo_provider : PhonenumberUtils.getMomoProviderFromNumber(intent.phonenumber)
+                    if (intent.phonenumber.length < 9) {
+                        return snapshot.ref.child('response')
+                            .set({ code: +Auth.UNPROCESSABLE_ENTITY })
+                    }
+                    const phonenumber = `+237${intent.phonenumber}`
 
+                    if (momoProviders.some(momoProvider => momoProvider.phonenumber === phonenumber)) {
+                        return snapshot.ref.child('response').set({ code: Auth.CONFLICT })
+                    }
+
+                    const momo_provider = intent.momo_provider === MobileMoneyProviders.EUM ? intent.momo_provider : PhonenumberUtils.getMomoProviderFromNumber(phonenumber)
+                    console.log({ momo_provider, phonenumber })
                     if (!momo_provider) return snapshot.ref.child('response').set({ code: 404 })
 
                     momoProviders.push({
-                        momo_provider: PhonenumberUtils.getMomoProviderFromNumber(intent.phonenumber),
-                        phonenumber: `${intent.phonenumber}`,
+                        momo_provider,
+                        phonenumber,
                         // rather using the time given by the client here because
                         // arrays can't have as direct children arrays on firestore
                         // and the firebase.firestore.fieldValue.serverTimeStamp seem to be an array.
@@ -248,7 +261,7 @@ export class Auth {
                         const promisses = [];
                         const promise1 = userDoc.ref.set({ phonenumber: intent.newPhonenumber }, { merge: true })
                         const promise2 = db.ref(intent.previousUuid).remove()
-                        const promise3 = db.ref(intent.newUuid).set(userDoc.ref.path)
+                        const promise3 = db.ref(`users/${intent.newUuid}`).set(userDoc.ref.path)
 
                         promisses.push(promise1, promise2, promise3)
                         return Promise.all(promisses)
@@ -278,7 +291,7 @@ export class Auth {
                     const userData = userDoc.data()
                     const { avatarUrl } = userData;
                     let splits = avatarUrl.split('/')
-                    splits.splice(splits.length -1, 1)
+                    splits.splice(splits.length - 1, 1)
                     splits.push(`${intent.imageStorageRef.split('/').pop()}`)
                     const newImagePath = `${splits.join('/')}`
                     const promise1 = File.moveFileFromTo(intent.imageStorageRef, newImagePath)
@@ -287,15 +300,19 @@ export class Auth {
                     const promise3 = deletedProfileImageRef.set({
                         userRef: intent.userRef,
                         avatarUrl,
-                        deletedAt: admin.firestore.FieldValue.serverTimestamp()
+                        //made a mistake here of saving FieldValue.TIMESTAMP() which is a
+                        //firestore method meanwhile I was trying to save rather to the 
+                        //realtime database. so don't confuse and save a realtime database
+                        //value in firestore or the other way round( this above case)
+                        deletedAt: admin.database.ServerValue.TIMESTAMP,
                     })
                     Promise.all([promise1, promise2, promise3])
                         .then(() => {
-                            snapshot.ref.child('response').set({code: 200})
+                            snapshot.ref.child('response').set({ code: 200 })
                             resolve()
                         })
                         .catch(() => {
-                            snapshot.ref.child('response').set({code: 500})
+                            snapshot.ref.child('response').set({ code: 500 })
                             reject()
                         })
 
@@ -339,17 +356,17 @@ export class Auth {
                     const userData = userSnapshot.data()
                     const encryptedTransactionCode = await CryptoUtils.encrypt(intent.transactionCode, 'secret_key_here')
 
-                    // .then(encryptedTransactionCode => {
-                    if (encryptedTransactionCode === userData.transactionCode) {
+                    console.log({ encryptedTransactionCode, givenCode: userData.transaction_pin_code })
+                    if (encryptedTransactionCode === userData.transaction_pin_code) {
                         const promisses = [];
                         const promise1 = userSnapshot.ref.set(
                             {
                                 isDeleted: true,
-                                deletedAt: admin.firestore.FieldValue.serverTimestamp()
+                                deletedAt: FieldValue.serverTimestamp()
                             },
                             { merge: true }
                         )
-                        const promise2 = db.child(intent.auuid).remove()
+                        const promise2 = db.child(`users/${intent.auuid}`).remove()
                         promisses.push(promise1, promise2)
                         return new Promise((resolve, reject) => {
                             Promise.all(promisses)
@@ -369,6 +386,33 @@ export class Auth {
                     // })
                 })
         });
+    static onUpdateTransactionCode = functions.database.ref('intents/update_transaction_code/{timestamp_midnight_today}/{newRef}')
+        .onCreate((snapshot) => {
+            const intent = snapshot.val() as UpdateTransactionCode
+            const firestoreDb = admin.firestore()
 
+            return firestoreDb.runTransaction(t => {
+                return t.get(firestoreDb.doc(intent.userRef))
+                    .then(async userSnapshot => {
+                        const userData = userSnapshot.data()
+                        const encryptedTransactionCode = await CryptoUtils.encrypt(intent.currentTransactionCode, 'secret_key_here')
 
+                        console.log({ encryptedTransactionCode, givenCode: userData.transaction_pin_code })
+                        if (encryptedTransactionCode === userData.transaction_pin_code) {
+
+                            const newEncryptedTransactionCode = await CryptoUtils.encrypt(intent.newTransactionCode, 'secret_key_here')
+                            const promisses = [];
+                            return userSnapshot.ref.set(
+                                { transaction_pin_code: newEncryptedTransactionCode },
+                                { merge: true }
+                            )
+                            .then(() => snapshot.ref.child('response').set({ code: 200 }))
+                            .catch(() => snapshot.ref.child('response').set({ code: 500 }))
+                        }
+                        return snapshot.ref.child('response').set({ code: 401 })
+                    });
+            })
+
+        });
 }
+

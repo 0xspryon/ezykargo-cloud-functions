@@ -14,6 +14,7 @@ export const onChangePrincipalPhonenumber = Auth.changePrincipalPhonenumber
 export const onDeleteWithdrawalPhonenumber = Auth.deleteWithdrawalPhonenumber
 export const onDeleteMomoProviderIntent = Auth.onDeleteAccount
 export const onUpdateProfileImage = Auth.updateProfileImage
+export const onUpdateTransactionCode = Auth.onUpdateTransactionCode
 
 //trucks management
 export const listenAddTruckIntent = TrucksIntent.listenAddTruckIntent

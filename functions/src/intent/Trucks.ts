@@ -289,10 +289,10 @@ export class TrucksIntent {
                             common_name: truckData.common_name,
                             immatriculation: truckData.immatriculation,
                             make_by: truckData.make_by,
-                            hasAValidInsurrance: false,
+                            hasAValidInsurrance: true,
                             model: truckData.model,
                             hasCurrentDriver: false,
-                            hasValidTechnicalVisit: false,
+                            hasValidTechnicalVisit: true,
                             number_of_seats: +truckData.number_of_seats,
                             number_of_tyres: +truckData.number_of_tyres,
                             registration_certificate: {
@@ -313,6 +313,7 @@ export class TrucksIntent {
                             isDeleted: false
                         }
                         if (truckData.driver_ref !== "N/A") {
+                            truckDoc.hasCurrentDriver = true
                             truckDoc.driver = {
                                 fullName: truckData.driverFullName,
                                 ref: truckData.driver_ref,
