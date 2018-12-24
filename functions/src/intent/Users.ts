@@ -45,7 +45,7 @@ export class UsersIntent {
                                                 freightage_ref: data["freightageRef"],
                                                 avatarUrl: userData.avatarUrl,
                                                 fullName: userData.fullName,
-                                                texte: data["reviewText"],
+                                                review_text: data["reviewText"],
                                                 driver: false,
                                             })
                                             .then(()=>{

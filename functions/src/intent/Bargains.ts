@@ -129,6 +129,7 @@ export class BargainsIntent {
             const timestamp = context.params.timestamp
 
             const postData = snapshot.val()
+            //get freightage 
             firestore.doc(Freightages.getRef(freightageRef)).get()
                 .then(freightageDataSnapshot => {
                     const freightageData = freightageDataSnapshot.data()
@@ -140,6 +141,7 @@ export class BargainsIntent {
                             .set({ code: 401 })
                         return;
                     }
+                    //check if freightage still in idle status 
                     if(!freightageData.idle){
                         realtimeDatabase.ref(`/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`).ref
                             .set({ code: 403 })
@@ -244,7 +246,8 @@ export class BargainsIntent {
                                                     isFinish = true
                                                     selectedBargain = Object.assign({},bargain)
                                                     selectedDrivers.push({
-                                                        driverRef: bargain.userRef, price: bargain.price,
+                                                        driverRef: bargain.userRef, 
+                                                        price: bargain.price,
                                                         avatarUrl: bargain.avatarUrl,
                                                         uniqID: bargain.uniqID,
                                                         truckRef: driverDoc.truck.truckRef,
@@ -269,7 +272,7 @@ export class BargainsIntent {
                                                 amount: selectedBargain.price,
                                                 bargains,
                                                 drivers: selectedDrivers,
-                                                driversRefString: drivers.map((driver) => {
+                                                driversRefString: selectedDrivers.map((driver) => {
                                                     return driver.driverRef
                                                 }),
                                             }
