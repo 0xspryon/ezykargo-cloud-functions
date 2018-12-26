@@ -20,13 +20,13 @@ export class TrucksIntent {
                     }
                     if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
                         return truckSnapshot.ref
-                        .set(
-                            {
-                                deletedAt: FieldValue.serverTimestamp(),
-                                isDeleted: true,
-                            },
-                            { merge: true }
-                        )
+                            .set(
+                                {
+                                    deletedAt: FieldValue.serverTimestamp(),
+                                    isDeleted: true,
+                                },
+                                { merge: true }
+                            )
                             .then(() => {
                                 console.log("Set deleted at value")
                                 const driver = truckDataSnapshot.driver
@@ -63,21 +63,58 @@ export class TrucksIntent {
     - push new driver to truck drivers collection
     - add driver info to truck
     - add truck info to driver
-    - return code 201 or an error-code 
+    - return code 201 or an error-code
+    - 409: conflict, driver already has a truck.
+    - 404: not found, driver can't be found.
     */
     static listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{timestamp}/associate_driver/{push_id}')
         .onCreate((snapshot, context) => {
             const newIntentDataSnapshot = snapshot.val()
+            let consentData: any;
             // const firestore = admin.firestore()
             return Trucks.getDocByRef(newIntentDataSnapshot.truckRef)
-                .then(truckSnapshot => {
+                .then(async truckSnapshot => {
                     if (!truckSnapshot.exists) {
                         snapshot.ref.child("response").set({ code: 404 })
                         return false
                     }
-                    if (newIntentDataSnapshot.driverRef !== "N/A" && !Users.refExsits(newIntentDataSnapshot.driverRef)) {
-                        snapshot.ref.child("response").set({ code: 404 })
-                        return false
+
+                    //verify trucker has no truck before associating
+                    if (newIntentDataSnapshot.driverRef != "N/A") {
+                            await new Promise((resolve, reject) => {
+                            admin.database().ref(newIntentDataSnapshot.consentRef).once('value', consentSnapshot => {
+                                if (consentSnapshot.exists) {
+                                    consentData = consentSnapshot.val()
+                                    console.log(consentData)
+                                    resolve(consentSnapshot.val())
+                                }
+                                else {
+                                    snapshot.ref.child("response").set({ code: 400 })
+                                    reject("No consent was made with the driver")
+                                }
+                                consentSnapshot.ref.remove()        
+                            })
+                        })
+
+                        if (consentData.response.code !== 200 && consentData.response.driverRef !== newIntentDataSnapshot.driverRef) {
+                            snapshot.ref.child("response").set({ code: 401 })
+                            return false
+                        }
+
+                        const driverSnapshot = await admin.firestore().doc(newIntentDataSnapshot.driverRef).get()
+                        if (driverSnapshot.exists) {
+                            const driverData = driverSnapshot.data();
+
+                            console.log({ truck: driverData.truck })
+
+                            if (driverData.truck) {
+                                snapshot.ref.child("response").set({ code: 409 })
+                                return false
+                            }
+                        } else {
+                            snapshot.ref.child("response").set({ code: 404 })
+                            return false
+                        }
                     }
                     if (truckSnapshot.get('userRef') === newIntentDataSnapshot.userRef) {
                         const promises = []
@@ -122,6 +159,7 @@ export class TrucksIntent {
                                         },
                                         driver_ref: newIntentDataSnapshot.driverRef,
                                         hasCurrentDriver: true,
+                                        percentage: consentData.percentage,
                                         driverCount: driverCount,
                                     }, { merge: true })
                                         .then(() => resolve())
@@ -139,6 +177,7 @@ export class TrucksIntent {
                         //add truck info to driver
                         promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
                             truck: {
+                                percentage: consentData.percentage,
                                 truckRef: truckSnapshot.ref,
                                 images: truckSnapshot.get("images"),
                                 carrying_capacity: +truckSnapshot.get('carrying_capacity'),
@@ -158,7 +197,7 @@ export class TrucksIntent {
                         }, { merge: true }))
                         // }else{
                         //remove previous driver
-                        promises.push(truckSnapshot.ref.set({ driver: null }, { merge: true }))
+                        // promises.push(truckSnapshot.ref.set({ driver: null }, { merge: true }))
                         // }
                         //return respponse 200
                         return Promise.all(promises).then(() => {
@@ -307,19 +346,20 @@ export class TrucksIntent {
                             volume: +truckData.volume,
                             weight: +truckData.weight,
                             driver: {},
+                            driverCount:0,
                             createdAt: FieldValue.serverTimestamp(),
                             updatedAt: FieldValue.serverTimestamp(),
                             isDisabled: false,
                             isDeleted: false
                         }
-                        if (truckData.driver_ref !== "N/A") {
-                            truckDoc.hasCurrentDriver = true
-                            truckDoc.driver = {
-                                fullName: truckData.driverFullName,
-                                ref: truckData.driver_ref,
-                            }
-                            truckDoc[`driverCount`] = 1;
-                        }
+                        // if (truckData.driver_ref !== "N/A") {
+                        //     truckDoc.hasCurrentDriver = true
+                        //     truckDoc.driver = {
+                        //         fullName: truckData.driverFullName,
+                        //         ref: truckData.driver_ref,
+                        //     }
+                        //     truckDoc[`driverCount`] = 1;
+                        // }
                         const uid = truckData.userRef.split("/").pop()
 
                         console.log('saving images now')
@@ -400,6 +440,7 @@ export class TrucksIntent {
                                                         number_of_tyres: +truckData.number_of_tyres,
                                                         start_work: +truckData.start_work,
                                                         volume: +truckData.volume,
+                                                        weight: +truckData.weight,
                                                         createdAt: FieldValue.serverTimestamp()
                                                     }
                                                 }, { merge: true }))
