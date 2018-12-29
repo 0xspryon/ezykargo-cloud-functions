@@ -205,6 +205,7 @@ export class FreightagesIntent {
                         }
                         const supData = {
                             onTransit: false,
+                            pickup: false,
                             deliveredAt: null
                         }
 
@@ -212,7 +213,9 @@ export class FreightagesIntent {
                             if(data["userRef"].indexOf(driver.driverRef)!==-1){
                                     driver.onTransit = false
                                     driver.delivery = true
-                            } 
+                            }
+                            if(driver.pickup)
+                                supData.pickup = true
                             if(!driver.delivery)
                                 supData.onTransit = true
                             return driver
@@ -287,14 +290,23 @@ export class FreightagesIntent {
 
                         const supData = {
                             delivered: false,
+                            onTransit: false,
+                            pickup: false,
                             completedAt: null
                         }
+
+                        let driverSelected
 
                         const drivers = freightageData.drivers.map((driver)=>{
                             if(data["driverRef"].indexOf(driver.driverRef)!==-1){
                                     driver.completed = true
                                     driver.delivery = false
-                            } 
+                                    driverSelected = driver
+                            }
+                            if(driver.pickup)
+                                supData.pickup = true
+                            if(!driver.delivery)
+                                supData.onTransit = true
                             if(!driver.completed)
                                 supData.delivered = true
                             return driver
@@ -311,8 +323,8 @@ export class FreightagesIntent {
                         .then(() => {
                             if(!supData.delivered){
                                 const promises = []
-                                freightageData.drivers.forEach((driver)=>{
-                                    promises.push(firestore.doc(driver.driverRef).get()
+                                // freightageData.drivers.forEach((driver)=>{
+                                    promises.push(firestore.doc(driverSelected.driverRef).get()
                                         .then(driverDataSnapshot => {
                                             const driverData = driverDataSnapshot.data()
                                             console.log(driverData)
@@ -352,7 +364,7 @@ export class FreightagesIntent {
                                                 })
                                             })
                                     )
-                                })
+                                // })
                                 return Promise.all(promises).then(() => {
                                     return realtimeDatabase.ref(`/intents/${timestamp}/mark_as_completed/${ref}/response/code`).ref
                                         .set(200)

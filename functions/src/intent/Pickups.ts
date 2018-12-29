@@ -171,11 +171,11 @@ export class PickupsIntent {
                                     items: new_items,
                                     drivers: freightageData.drivers.map((driver)=>{
                                             if(postData.driverRef.indexOf(driver.driverRef)!==-1){
-                                                    if(!postData.validate)
-                                                        driver.items = []
-                                                    else
-                                                        driver.onTransit = true
-                                                    driver.pickup = postData.validate
+                                                if(!postData.validate)
+                                                    driver.items = []
+                                                else
+                                                    driver.onTransit = true
+                                                driver.pickup = postData.validate
                                             } 
                                     return driver
                                     })
