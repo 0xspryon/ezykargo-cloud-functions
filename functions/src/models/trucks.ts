@@ -36,4 +36,5 @@ export class Trucks {
     static isValidInsurrance= (insurrance) =>{
         return true
     }
+    static ICONSISTENT: any;
 }
