@@ -2,9 +2,11 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { File } from '../utils/File';
 import { Users, Trucks } from '../models';
+import { NotificationActions } from '../models/NotificationActions';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 export class TrucksIntent {
+    static INCONSISTENT: number = 400;
 
     static listenDeleteTruckIntent = functions.database.ref('/intents/delete_truck/{timestamp}/{ref}')
         .onCreate((snapshot, context) => {
@@ -18,10 +20,19 @@ export class TrucksIntent {
                         snapshot.ref.child("response").set({ code: 404 })
                         return false
                     }
+
+                    const truckData = truckSnapshot.data()
+                    if (truckData.hasCurrentDriver) {
+                        snapshot.ref.child("response").set({ code: TrucksIntent.INCONSISTENT })
+                        return false
+                    }
                     if (truckSnapshot.get('userRef') === truckDataSnapshot.userRef) {
                         return truckSnapshot.ref
                             .set(
                                 {
+                                    driver: null,
+                                    driver_ref: null,
+                                    hasCurrentDriver: false,
                                     deletedAt: FieldValue.serverTimestamp(),
                                     isDeleted: true,
                                 },
@@ -59,7 +70,7 @@ export class TrucksIntent {
     - verify user at userRef owns the car
     - check if new driver exists
     - get previous driver and set it to idle
-    - remove truck from previous driver
+    - Verify truck has no driver
     - push new driver to truck drivers collection
     - add driver info to truck
     - add truck info to driver
@@ -67,7 +78,7 @@ export class TrucksIntent {
     - 409: conflict, driver already has a truck.
     - 404: not found, driver can't be found.
     */
-    static listenLinkNewDriverTruckIntent = functions.database.ref('/intents/{timestamp}/associate_driver/{push_id}')
+    static listenLinkNewDriverTruckIntent = functions.database.ref('/intents/associate_driver/{timestamp}/{push_id}')
         .onCreate((snapshot, context) => {
             const newIntentDataSnapshot = snapshot.val()
             let consentData: any;
@@ -81,7 +92,7 @@ export class TrucksIntent {
 
                     //verify trucker has no truck before associating
                     if (newIntentDataSnapshot.driverRef != "N/A") {
-                            await new Promise((resolve, reject) => {
+                        await new Promise((resolve, reject) => {
                             admin.database().ref(newIntentDataSnapshot.consentRef).once('value', consentSnapshot => {
                                 if (consentSnapshot.exists) {
                                     consentData = consentSnapshot.val()
@@ -92,7 +103,7 @@ export class TrucksIntent {
                                     snapshot.ref.child("response").set({ code: 400 })
                                     reject("No consent was made with the driver")
                                 }
-                                consentSnapshot.ref.remove()        
+                                consentSnapshot.ref.remove()
                             })
                         })
 
@@ -126,14 +137,10 @@ export class TrucksIntent {
                             .get()
                             .then(driverQuerySnapshot => {
                                 driverQuerySnapshot.forEach((driverSnapshot) => {
-                                    console.log(driverSnapshot.data())
+                                    // console.log(driverSnapshot.data())
                                     promises.push(driverSnapshot.ref.set({ idle: true }, { merge: true }))
                                     //remove truck from drivernewIntentDataSnapshot.truckRef
-                                    promises.push(Users.getDocByRef(driverSnapshot.data().driver_ref).then((driverDocumentSnapshot) => {
-                                        const microPromise = driverDocumentSnapshot.ref.set({ truck: null }, { merge: true })
-                                        promises.push(microPromise)
-                                        // return microPromise
-                                    }))
+                                    // promises.push(firestore.doc(driverSnapshot.data().driver_ref).set({ truck: null }, { merge: true }))
                                 })
                             }))
                         // if(newIntentDataSnapshot.driverRef!== "N/A"){
@@ -160,6 +167,7 @@ export class TrucksIntent {
                                         driver_ref: newIntentDataSnapshot.driverRef,
                                         hasCurrentDriver: true,
                                         percentage: consentData.percentage,
+                                        contractDate: FieldValue.serverTimestamp(),
                                         driverCount: driverCount,
                                     }, { merge: true })
                                         .then(() => resolve())
@@ -177,6 +185,7 @@ export class TrucksIntent {
                         //add truck info to driver
                         promises.push(firestore.doc(newIntentDataSnapshot.driverRef).set({
                             truck: {
+                                contractDate: FieldValue.serverTimestamp(),
                                 percentage: consentData.percentage,
                                 truckRef: truckSnapshot.ref,
                                 images: truckSnapshot.get("images"),
@@ -222,10 +231,11 @@ export class TrucksIntent {
     - check if driver at driverRef exists
     - get the driver and set it to idle
     - remove truck info from driver
+    - remove dissociation notification from driver
     - remove driver info from truck
     - return code 201 or any appropriate error-code
     */
-    static listenUnLinkDriverTruckIntent = functions.database.ref('/intents/{timestamp}/dissociate_driver/{push_id}')
+    static listenUnLinkDriverTruckIntent = functions.database.ref('/intents/dissociate_driver/{timestamp}/{push_id}')
         .onCreate((snapshot, context) => {
             const dissociateDriverDataSnapshot = snapshot.val()
             const firestore = admin.firestore()
@@ -246,16 +256,35 @@ export class TrucksIntent {
                                 const promises = []
                                 promises.push(firestore.collection(truckSnapshot.ref.path + "/drivers")
                                     .where("driver_ref", "==", dissociateDriverDataSnapshot.driverRef)
-                                    .orderBy('createdAt', 'desc')
+                                    .orderBy('createdAt', 'asc')
                                     .limit(1)
                                     .get()
-                                    .then(driverQuerySnapshot => {
-                                        driverQuerySnapshot.forEach((driverSnapshot) => {
-                                            console.log({ driverSnapshot: driverSnapshot.data() })
-                                            promises.push(driverSnapshot.ref.set({ idle: true }, { merge: true }))
-                                            promises.push(driverSnapShot.ref.set({ truck: null }, { merge: true }))
+                                    .then(truckerDriverQuerySnapshot => {
+                                        truckerDriverQuerySnapshot.forEach((truckDriverSnapshot) => {
+                                            promises.push(truckDriverSnapshot.ref.set({
+                                                idle: true,
+                                                truck: null,
+                                                markedForDissociationAt: null,
+                                                markedForDissociation: false,
+                                            }, { merge: true }))
                                         })
                                     }))
+
+                                promises.push(firestore.collection(driverSnapShot.ref.path + '/notifications')
+                                    .orderBy('createdAt', 'asc')
+                                    .where("action", "==", NotificationActions.DISSOCIATION_NOTIFICATION_ACTION)
+                                    .limit(1)
+                                    .get()
+                                    .then(dissociationNotificationsSnapshot => {
+                                        dissociationNotificationsSnapshot.forEach(dissociationNotificationSnapshot => {
+                                            promises.push(dissociationNotificationSnapshot.ref.delete())
+                                        })
+                                    }))
+                                
+                                    const driverdoc = driverSnapShot.data()
+                                    delete driverdoc.truck
+                                promises.push(driverSnapShot.ref.set({...driverdoc}))
+
                                 promises.push(
                                     truckSnapshot.ref.set(
                                         {
@@ -265,6 +294,8 @@ export class TrucksIntent {
                                             driver_ref: "N/A",
                                             hasCurrentDriver: false,
                                             dissociatedAt: FieldValue.serverTimestamp(),
+                                            markedForDissociationAt: null,
+                                            markedForDissociation: false,
                                         }, { merge: true }
                                     )
                                 )
@@ -284,8 +315,169 @@ export class TrucksIntent {
                             }
 
                         })
-                }).catch((association_driver_error_internal_500) => {
-                    console.log({ association_driver_error_internal_500 })
+                }).catch((dissociation_driver_error_internal_500) => {
+                    console.log({ dissociation_driver_error_internal_500 })
+                    snapshot.ref.child("response").set({ code: 500 })
+                    return false
+                })
+        })
+
+
+    /*
+    @notify dissociation of a  a trucker
+    - verify user at userRef owns the car
+    - check if driver at driverRef exists
+    - mark truck for dissociation
+    - get driver from truck drivers and mark for dissociation
+    - get driver add notification of dissociation
+    - return code 201 or any appropriate error-code
+    */
+    static listenNotifyDriverOfDissociation = functions.database.ref('/intents/notify_dissociate_driver/{timestamp}/{push_id}')
+        .onCreate((snapshot, context) => {
+            const dissociateDriverDataSnapshot = snapshot.val()
+            const firestore = admin.firestore()
+            return Trucks.getDocByRef(dissociateDriverDataSnapshot.truckRef)
+                .then(truckSnapshot => {
+                    if (!truckSnapshot.exists) {
+                        snapshot.ref.child("response").set({ code: 404 })
+                        return false
+                    }
+
+                    return firestore.doc(dissociateDriverDataSnapshot.driverRef).get()
+                        .then(driverSnapShot => {
+                            const NUMBER_OF_NOTIFICATION_DAYS_TO_ACTUAL_DISSOCIATION = 7;
+                            if (dissociateDriverDataSnapshot.driverRef !== "N/A" && !driverSnapShot.exists) {
+                                snapshot.ref.child("response").set({ code: 404 })
+                                return false
+                            }
+                            if (truckSnapshot.get('userRef') === dissociateDriverDataSnapshot.userRef) {
+                                const promises = []
+                                promises.push(firestore.collection(truckSnapshot.ref.path + "/drivers")
+                                    .orderBy('createdAt', 'asc')
+                                    .where("driver_ref", "==", dissociateDriverDataSnapshot.driverRef)
+                                    .limit(1)
+                                    .get()
+                                    .then(driverQuerySnapshot => {
+                                        driverQuerySnapshot.forEach((truckerDriverSnapshot) => {
+                                            console.log({ driverSnapshot: truckerDriverSnapshot.data() })
+                                            promises.push(
+                                                truckSnapshot.ref.set(
+                                                    {
+                                                        markedForDissociation: true,
+                                                        markedForDissociationAt: FieldValue.serverTimestamp()
+                                                    }, { merge: true }
+                                                )
+                                            )
+                                            promises.push(truckerDriverSnapshot.ref.set({
+                                                markedForDissociation: true,
+                                                markedForDissociationAt: FieldValue.serverTimestamp(),
+                                            }, { merge: true })
+                                            )
+                                            promises.push(firestore.collection(dissociateDriverDataSnapshot.driverRef + '/notifications').add({
+                                                action: NotificationActions.DISSOCIATION_NOTIFICATION_ACTION,
+                                                createdAt: FieldValue.serverTimestamp(),
+                                                dueTo: NUMBER_OF_NOTIFICATION_DAYS_TO_ACTUAL_DISSOCIATION,
+                                            }))
+                                        })
+                                    }))
+                                return Promise.all(promises).then(() => {
+                                    snapshot.ref.child("response").set({ code: 201 })
+                                    return false
+                                })
+                                    .catch(err => {
+                                        console.log({ err })
+                                        snapshot.ref.child("response").set({ code: 500 })
+                                        return false
+                                    })
+                            } else {
+                                snapshot.ref.child("response").set({ code: 401 })
+                                return false
+                            }
+
+                        })
+                }).catch((notify_dissociation_driver_error_internal_500) => {
+                    console.log({ notify_dissociation_driver_error_internal_500 })
+                    snapshot.ref.child("response").set({ code: 500 })
+                    return false
+                })
+        })
+    /*
+    @notify dissociation of a  a trucker
+    - verify user at userRef owns the car
+    - check if driver at driverRef exists
+    - unmark truck for dissociation
+    - get driver from truck drivers and unmark for dissociation
+    - get driver remove notification of dissociation
+    - return code 201 or any appropriate error-code
+    */
+    static listenCancelNotifyDriverOfDissociation = functions.database.ref('/intents/cancel_notify_dissociate_driver/{timestamp}/{push_id}')
+        .onCreate((snapshot, context) => {
+            const dissociateDriverDataSnapshot = snapshot.val()
+            const firestore = admin.firestore()
+            return Trucks.getDocByRef(dissociateDriverDataSnapshot.truckRef)
+                .then(truckSnapshot => {
+                    if (!truckSnapshot.exists) {
+                        snapshot.ref.child("response").set({ code: 404 })
+                        return false
+                    }
+
+                    return firestore.doc(dissociateDriverDataSnapshot.driverRef).get()
+                        .then(driverSnapShot => {
+                            const NUMBER_OF_NOTIFICATION_DAYS_TO_ACTUAL_DISSOCIATION = 7;
+                            if (dissociateDriverDataSnapshot.driverRef !== "N/A" && !driverSnapShot.exists) {
+                                snapshot.ref.child("response").set({ code: 404 })
+                                return false
+                            }
+                            if (truckSnapshot.get('userRef') === dissociateDriverDataSnapshot.userRef) {
+                                const promises = []
+                                promises.push(firestore.collection(truckSnapshot.ref.path + "/drivers")
+                                    .orderBy('createdAt', 'asc')
+                                    .where("driver_ref", "==", dissociateDriverDataSnapshot.driverRef)
+                                    .limit(1)
+                                    .get()
+                                    .then(driverQuerySnapshot => {
+                                        driverQuerySnapshot.forEach((truckerDriverSnapshot) => {
+                                            console.log({ driverSnapshot: truckerDriverSnapshot.data() })
+                                            let truckData = truckSnapshot.data()
+                                            delete truckData.markedForDissociation
+                                            delete truckData.markedForDissociationAt;
+                                            promises.push(
+                                                truckSnapshot.ref.set({ ...truckData })
+                                            )
+                                            promises.push(truckerDriverSnapshot.ref.set({
+                                                markedForDissociation: false,
+                                                markedForDissociationAt: null,
+                                            }, { merge: true })
+                                            )
+                                            promises.push(firestore.collection(dissociateDriverDataSnapshot.driverRef + '/notifications')
+                                                .orderBy('createdAt', 'asc')
+                                                .where("action", "==", NotificationActions.DISSOCIATION_NOTIFICATION_ACTION)
+                                                .limit(1)
+                                                .get()
+                                                .then(dissociationNotificationsSnapshot => {
+                                                    dissociationNotificationsSnapshot.forEach(dissociationNotificationSnapshot => {
+                                                        promises.push(dissociationNotificationSnapshot.ref.delete())
+                                                    })
+                                                }))
+                                        })
+                                    }))
+                                return Promise.all(promises).then(() => {
+                                    snapshot.ref.child("response").set({ code: 201 })
+                                    return false
+                                })
+                                    .catch(err => {
+                                        console.log({ err })
+                                        snapshot.ref.child("response").set({ code: 500 })
+                                        return false
+                                    })
+                            } else {
+                                snapshot.ref.child("response").set({ code: 401 })
+                                return false
+                            }
+
+                        })
+                }).catch((notify_dissociation_driver_error_internal_500) => {
+                    console.log({ notify_dissociation_driver_error_internal_500 })
                     snapshot.ref.child("response").set({ code: 500 })
                     return false
                 })
@@ -346,7 +538,7 @@ export class TrucksIntent {
                             volume: +truckData.volume,
                             weight: +truckData.weight,
                             driver: {},
-                            driverCount:0,
+                            driverCount: 0,
                             createdAt: FieldValue.serverTimestamp(),
                             updatedAt: FieldValue.serverTimestamp(),
                             isDisabled: false,
