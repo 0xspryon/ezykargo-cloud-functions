@@ -49,7 +49,7 @@ export class FreightagesIntent {
                         arrival_date: +freightageData.arrival_date,
                         departure_date: +freightageData.departure_date,
                         // departure_time: freightageData.departure_time,
-                        car_pool_number: (freightageData.car_pool) ? +freightageData.car_pool_number : 0,
+                        // car_pool_number: (freightageData.car_pool) ? +freightageData.car_pool_number : 0,
                         volume: +freightageData.volume,
                         weight: +freightageData.weight,
                         image: "",
@@ -92,12 +92,37 @@ export class FreightagesIntent {
                                     // console.log({ freightagesCount : freightagesListSnapshot.get("freightagesCount"), data: freightagesListSnapshot.data()})
                                     freightagesList.set({ freightagesCount }, { merge: true })
                                         .then(() => {
-                                            realtimeDatabase.ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
-                                                .set({ code: 201 }).then(() => {
-                                                    resolve(true)
-                                                }).catch((err) => {
-                                                    reject(err)
-                                                })
+                                            // inscrement number of freigt in rtdb
+                                            let departure_date = new Date()
+                                            departure_date.setTime(freightageData.departure_date)
+                                            departure_date.setHours(0,0,0,0)
+                                            realtimeDatabase
+                                                .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`)
+                                                .once("value", (cityvalue) => {
+                                                    if(cityvalue.val()){
+                                                        realtimeDatabase
+                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                            number: cityvalue.val().number + 1,
+                                                            weight: +freightageData.weight + cityvalue.val().weight
+                                                        })
+                                                    }else{
+                                                        realtimeDatabase
+                                                            .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                                number: 1,
+                                                                weight: +freightageData.weight
+                                                            })
+                                                    }
+                                                    realtimeDatabase.ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
+                                                        .set({ code: 201 }).then(() => {resolve(true) }).catch((err) => { reject(err)})
+                                                },  () => {
+                                                    realtimeDatabase
+                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                            number: 1,
+                                                            weight: +freightageData.weight
+                                                        })
+                                                    realtimeDatabase.ref(`/intents/add_freightage/${timestamp}/${ref}`).ref.child("response")
+                                                        .set({ code: 201 }).then(() => {resolve(true) }).catch((err) => { reject(err)})
+                                                });
                                         })
                                 })
                         }).catch((err) => {

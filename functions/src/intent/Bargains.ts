@@ -102,8 +102,38 @@ export class BargainsIntent {
                         inBargain: false,
                     }, { merge: true })
                         .then(() => {
-                            realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
-                                .set({ code: 201 })
+                            let departure_date = new Date()
+                            departure_date.setTime(freightageDataSnapshot.data().departure_date)
+                            departure_date.setHours(0,0,0,0)
+                            realtimeDatabase
+                                .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`)
+                                .once("value", (cityvalue) => {
+                                    if(cityvalue.val()){
+                                        realtimeDatabase
+                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                                number: (cityvalue.val().number - 1) > 0? cityvalue.val().number - 1: 0,
+                                                weight: (-freightageDataSnapshot.data().weight + cityvalue.val().weight) > 0 ? (-freightageDataSnapshot.data().weight + cityvalue.val().weight) : 0
+                                            })
+                                    }else{
+                                        realtimeDatabase
+                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                                number: 0,
+                                                weight: 0
+                                            })
+                                    }
+                                    realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                                        .set({ code: 201 })
+                                },  () => {
+                                    realtimeDatabase
+                                        .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                            number: 0,
+                                            weight: 0
+                                        })
+                                    realtimeDatabase.ref(`/intents/hire_drivers/${freightageRef}/response`).ref
+                                        .set({ code: 201 })
+                                });
+
+                            
                         })
                         .catch((onrejected) => {
                             console.log("Reject 2", onrejected)
