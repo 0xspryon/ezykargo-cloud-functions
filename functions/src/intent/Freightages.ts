@@ -48,7 +48,7 @@ export class FreightagesIntent {
                         ...freightageData,
                         arrival_date: +freightageData.arrival_date,
                         departure_date: +freightageData.departure_date,
-                        departure_time: freightageData.departure_time,
+                        // departure_time: freightageData.departure_time,
                         car_pool_number: (freightageData.car_pool) ? +freightageData.car_pool_number : 0,
                         volume: +freightageData.volume,
                         weight: +freightageData.weight,

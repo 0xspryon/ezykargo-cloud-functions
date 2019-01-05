@@ -26,6 +26,7 @@ export class PickupsIntent {
             firestore.doc(Users.getRef(userRef)).get()
                 .then(async userDataSnapshot => {
                     const userData = userDataSnapshot.data()
+                    console.log(userData)
                     if(userData['transaction_pin_code']+"" !== ""+postData["password"]){
                         return realtimeDatabase.ref(`/intents/mark_as_pickup/${timestamp}/${freightageRef}/${userRef}/response`).ref
                             .set({ code: 403 })
@@ -124,6 +125,7 @@ export class PickupsIntent {
                 firestore.doc(Users.getRef(userRef)).get()
                 .then(async userDataSnapshot => {
                     const userData = userDataSnapshot.data()
+                    console.log(userData,userRef,postData)
                     if(userData['transaction_pin_code']+"" !== ""+postData["password"]){
                         return realtimeDatabase.ref(`/intents/validate_pickup/${timestamp}/${freightageRef}/${userRef}/response`).ref
                             .set({ code: 403 })
