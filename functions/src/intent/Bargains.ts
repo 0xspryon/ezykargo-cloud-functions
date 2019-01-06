@@ -102,21 +102,19 @@ export class BargainsIntent {
                         inBargain: false,
                     }, { merge: true })
                         .then(() => {
-                            let departure_date = new Date()
-                            departure_date.setTime(freightageDataSnapshot.data().departure_date)
-                            departure_date.setHours(0,0,0,0)
+                            let departure_date = freightageDataSnapshot.data().departure_date
                             realtimeDatabase
-                                .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`)
+                                .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date}/${freightageDataSnapshot.data().addressTo.mLocality}`)
                                 .once("value", (cityvalue) => {
                                     if(cityvalue.val()){
                                         realtimeDatabase
-                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
                                                 number: (cityvalue.val().number - 1) > 0? cityvalue.val().number - 1: 0,
                                                 weight: (-freightageDataSnapshot.data().weight + cityvalue.val().weight) > 0 ? (-freightageDataSnapshot.data().weight + cityvalue.val().weight) : 0
                                             })
                                     }else{
                                         realtimeDatabase
-                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                            .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
                                                 number: 0,
                                                 weight: 0
                                             })
@@ -125,7 +123,7 @@ export class BargainsIntent {
                                         .set({ code: 201 })
                                 },  () => {
                                     realtimeDatabase
-                                        .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date.getTime()}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
+                                        .ref(`/cities/${freightageDataSnapshot.data().addressFrom.mLocality}/${departure_date}/${freightageDataSnapshot.data().addressTo.mLocality}`).ref.set({
                                             number: 0,
                                             weight: 0
                                         })

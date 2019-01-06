@@ -93,21 +93,19 @@ export class FreightagesIntent {
                                     freightagesList.set({ freightagesCount }, { merge: true })
                                         .then(() => {
                                             // inscrement number of freigt in rtdb
-                                            let departure_date = new Date()
-                                            departure_date.setTime(freightageData.departure_date)
-                                            departure_date.setHours(0,0,0,0)
+                                            let departure_date = freightageData.departure_date
                                             realtimeDatabase
-                                                .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`)
+                                                .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date}/${freightageData.addressTo.mLocality}`)
                                                 .once("value", (cityvalue) => {
                                                     if(cityvalue.val()){
                                                         realtimeDatabase
-                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date}/${freightageData.addressTo.mLocality}`).ref.set({
                                                             number: cityvalue.val().number + 1,
                                                             weight: +freightageData.weight + cityvalue.val().weight
                                                         })
                                                     }else{
                                                         realtimeDatabase
-                                                            .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                            .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date}/${freightageData.addressTo.mLocality}`).ref.set({
                                                                 number: 1,
                                                                 weight: +freightageData.weight
                                                             })
@@ -116,7 +114,7 @@ export class FreightagesIntent {
                                                         .set({ code: 201 }).then(() => {resolve(true) }).catch((err) => { reject(err)})
                                                 },  () => {
                                                     realtimeDatabase
-                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date.getTime()}/${freightageData.addressTo.mLocality}`).ref.set({
+                                                        .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date}/${freightageData.addressTo.mLocality}`).ref.set({
                                                             number: 1,
                                                             weight: +freightageData.weight
                                                         })
