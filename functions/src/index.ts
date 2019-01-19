@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 
 import webApi from "./api";
 
-import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent,PickupsIntent} from "./intent";
+import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent,PickupsIntent, Finances} from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -49,3 +49,9 @@ export const listenMakePayment = TransactionsIntent.listenMakePayment
 
 //init API
 export const api = webApi;
+
+//Wecashup intergration.
+export const onPayment = Finances.onPayment
+export const onPaymentCallBack = Finances.onPaymentCallBack
+export const onPaymentWebhook = Finances.onPaymentWebhook
+export const onTransactionCode = Finances.onTransactionCode

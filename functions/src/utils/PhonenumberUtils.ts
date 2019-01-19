@@ -6,7 +6,6 @@ export class PhonenumberUtils {
      * phonenumber starts with +237.
      */
     static getMomoProviderFromNumber = number => {
-        let index = -1;
         const MTN = 7;
         const ORANGE = 9;
         const NEXTTEL = 6;

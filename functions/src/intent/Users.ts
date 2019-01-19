@@ -1,7 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { File } from '../utils/File';
-import { Freightages, Users } from '../models';
+import { Users } from '../models';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 export class UsersIntent {
@@ -31,7 +30,7 @@ export class UsersIntent {
                                     console.log(freightageData)
                                     if (data["userRef"].indexOf(freightageData["driverRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["userRef"])) {
                                         //is review for biz
-                                        let average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
+                                        const average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
                                         return reviewForDataSnapshot.ref
                                             .collection('reviews').doc()
                                             .set({
@@ -75,7 +74,7 @@ export class UsersIntent {
                                             +data.correctness,
                                         ]
 
-                                        let average = ratings.reduce((a, b) => a+ b , 0)/ratings.length;
+                                        const average = ratings.reduce((a, b) => a+ b , 0)/ratings.length;
                                         return reviewForDataSnapshot.ref
                                             .collection('reviews').doc()
                                             .set({

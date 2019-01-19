@@ -5,5 +5,6 @@ import {Auth} from "./Auth"
 import {UsersIntent} from "./Users";
 import {TransactionsIntent} from "./Transactions";
 import { PickupsIntent } from "./Pickups"
+import {Finances } from './Finances'
 
-export {Auth,UsersIntent,TrucksIntent,BargainsIntent,FreightagesIntent,TransactionsIntent,PickupsIntent}
+export {Auth,UsersIntent,TrucksIntent,BargainsIntent,FreightagesIntent,TransactionsIntent,PickupsIntent, Finances}

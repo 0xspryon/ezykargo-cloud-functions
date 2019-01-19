@@ -438,7 +438,7 @@ export class TrucksIntent {
                                     .then(driverQuerySnapshot => {
                                         driverQuerySnapshot.forEach((truckerDriverSnapshot) => {
                                             console.log({ driverSnapshot: truckerDriverSnapshot.data() })
-                                            let truckData = truckSnapshot.data()
+                                            const truckData = truckSnapshot.data()
                                             delete truckData.markedForDissociation
                                             delete truckData.markedForDissociationAt;
                                             promises.push(

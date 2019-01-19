@@ -26,7 +26,7 @@ export class TransactionsIntent {
                     }
                     const userData = userDataSnapshot.data()
                     const transactionRef = firestore.collection(Transactions.basePath).doc()
-                    let requestData = {
+                    const requestData = {
                         "service": serviceKey,
                         "phonenumber": data["phoneNumber"],
                         "amount": data["amount"],
