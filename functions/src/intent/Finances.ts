@@ -22,20 +22,18 @@ export class Finances {
 
     static onPaymentWebhook = functions.https.onRequest((req, res) => {
         res.set('Access-Control-Allow-Origin', '*');
+        console.log({ requestBody: JSON.parse(req.body) })
 
         if (req.method === 'OPTIONS') {
-          // Send response to OPTIONS requests
-          res.set('Access-Control-Allow-Methods', 'GET');
-          res.set('Access-Control-Allow-Headers', 'Content-Type');
-          res.set('Access-Control-Max-Age', '3600');
-          res.status(204).send('');
+            // Send response to OPTIONS requests
+            res.set('Access-Control-Allow-Methods', 'GET');
+            res.set('Access-Control-Allow-Headers', 'Content-Type');
+            res.set('Access-Control-Max-Age', '3600');
+            res.status(204).send('');
         } else {
-          // Set CORS headers for the main request
-          res.set('Access-Control-Allow-Origin', '*');
-          //main code goes in here like below instruction
-          res.send('Hello World!');
-          console.log({contentType: req.get('content-type')})
-          console.log({ rawHeaders: req.rawHeaders, method: 'webhook' })
+            // Set CORS headers for the main request
+            //main code goes in here like below instruction
+            res.status(200).json({ status: 200 });
         }
     });
 
