@@ -25,6 +25,7 @@ export const listenLinkNewDriverTruckIntent = TrucksIntent.listenLinkNewDriverTr
 export const listenUnLinkDriverTruckIntent = TrucksIntent.listenUnLinkDriverTruckIntent
 export const listenNotifyDriverOfDissociation = TrucksIntent.listenNotifyDriverOfDissociation
 export const listenCancelNotifyDriverOfDissociation = TrucksIntent.listenCancelNotifyDriverOfDissociation
+export const listenAddRegistrationCertificateIntent = TrucksIntent.listenAddRegistrationCertificateIntent
 
 //freightage management
 export const listenAddFreightageIntent = FreightagesIntent.listenAddFreightageIntent
