@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { Transactions } from '../models';
-import {cloud_function_url_notification,placePayment,serviceKey,serviceSecret} from "../api";
+import {cloud_function_url_notification,placePayment,serviceKey} from "../api";
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 const axios = require('axios');
 

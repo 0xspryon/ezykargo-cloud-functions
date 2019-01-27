@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 
 import webApi from "./api";
 
-import {Auth, TrucksIntent,FreightagesIntent,BargainsIntent,UsersIntent,TransactionsIntent,PickupsIntent, Finances} from "./intent";
+import { Auth, TrucksIntent, FreightagesIntent, BargainsIntent, UsersIntent, TransactionsIntent, PickupsIntent, Finances, Notifications } from "./intent";
 
 //inititalize firebase admin
 admin.initializeApp(functions.config().firebase);
@@ -55,3 +55,7 @@ export const onPayment = Finances.onPayment
 export const onPaymentCallBack = Finances.onPaymentCallBack
 export const onPaymentWebhook = Finances.onPaymentWebhook
 export const onTransactionCode = Finances.onTransactionCode
+
+//Notifications
+export const onDepositNotification = Notifications.onDeposit
+export const onNotification = Notifications.onNotification
