@@ -5,6 +5,8 @@ import { Users, Trucks } from '../models';
 import { NotificationActions } from '../models/NotificationActions';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
+const truckDocumentsPath = "bucket/trucksDocuments"
+
 export class TrucksIntent {
     static INCONSISTENT: number = 400;
 
@@ -280,10 +282,10 @@ export class TrucksIntent {
                                             promises.push(dissociationNotificationSnapshot.ref.delete())
                                         })
                                     }))
-                                
-                                    const driverdoc = driverSnapShot.data()
-                                    delete driverdoc.truck
-                                promises.push(driverSnapShot.ref.set({...driverdoc}))
+
+                                const driverdoc = driverSnapShot.data()
+                                delete driverdoc.truck
+                                promises.push(driverSnapShot.ref.set({ ...driverdoc }))
 
                                 promises.push(
                                     truckSnapshot.ref.set(
@@ -678,87 +680,195 @@ export class TrucksIntent {
 
         })
 
-    static listenAddTechnicalVisitIntent = functions.database.ref('/intents/add_technical_visit/{uid}/{ref}/finished')
-        .onUpdate(async (change, context) => {
-            const snapshot = change.after
+    static listenAddTechnicalVisitIntent = functions.database.ref('/intents/add_technical_visit/{ref}/finished')
+        .onCreate(async (snapshot, context) => {
             if (!snapshot.val())
                 return false
-            const uid = context.params.uid
             const ref = context.params.ref
 
-            const tvSnapshot = await admin.database().ref(`/intents/add_technical_visit/${uid}/${ref}`).once('value')
-            const tvData = tvSnapshot.val()
-            if (!Trucks.isValidTechnicalVisit(tvData))
-                // format response and put into rtdb
-                return false
-            const truckSnapShot = await Trucks.getDoc(tvData.truck_id)
-            //check if user is trucks owner
-            if (truckSnapShot.data().owner_uid !== Users.getRef(uid))
-                // format response and put into rtdb
-                return false
+            const TechnicalVistSnapshot = await admin.database().ref(`/intents/add_technical_visit/${ref}`).once('value')
+            const TechnicalVistData = TechnicalVistSnapshot.val()
+
+            const truckSnapShot = await Trucks.getDocByRef(TechnicalVistData.truck_ref)
+            const repSnapShot = await Users.getDocByRef(TechnicalVistData.user_ref)
+
+            if (!truckSnapShot.data())
+                return admin.database().ref(`/intents/add_technical_visit/${ref}/response`).ref.set({ code: 404 })
+            if (truckSnapShot.data().immatriculation.toLocaleLowerCase() !== TechnicalVistData.immatriculation.toLocaleLowerCase())
+                return admin.database().ref(`/intents/add_technical_visit/${ref}/response`).ref.set({ code: 403 })
+            if (!repSnapShot.data().is_ezy_rep)
+                return admin.database().ref(`/intents/add_technical_visit/${ref}/response`).ref.set({ code: 401 })
             const promises = []
             //move images to new endpoint 
-            const front_image_path = tvData.FRONT_IMAGE_URL.path
-            const back_image_path = tvData.BACK_IMAGE_URL.path
-            const FRONT_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${front_image_path.split("/").pop()}`
-            const BACK_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${back_image_path.split("/").pop()}`
-            promises.push(File.moveFileFromTo(front_image_path, FRONT_IMAGE_MV_PATH))
-            promises.push(File.moveFileFromTo(back_image_path, BACK_IMAGE_MV_PATH))
+            let image_path = TechnicalVistData.image_url
+            image_path = image_path.split("?")[0]
+            const IMAGE_MV_PATH = `/trucks/${ref}/${truckSnapShot.id}/${image_path.split("/").pop()}`
+            promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH))
             // create tv doc
-            const tvDoc = {
-                frontImageUrl: FRONT_IMAGE_MV_PATH,
-                backImageUrl: BACK_IMAGE_MV_PATH,
-                expirationDate: tvData.expirationDate,
-                date: tvData.date,
+            const TechnicalVistDoc = {
+                imageUrl: IMAGE_MV_PATH,
+                expirationDate: TechnicalVistData.expiration_date,
+                date: TechnicalVistData.date,
+                recordNumber: TechnicalVistData.record_number,
+                serialNumber: TechnicalVistData.serial_number,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
             }
-            console.log(tvDoc)
+            console.log(TechnicalVistDoc)
             // store it to firestore
-            promises.push(admin.firestore().collection(Trucks.getRef(truckSnapShot.id) + 'technical_visits').add(tvDoc))
-            promises.push(admin.database().ref(`/intents/add_technical_visit/${uid}/${ref}`).remove())
+            promises.push(admin.firestore().collection(truckDocumentsPath + '/technical_visits').add({
+                ...TechnicalVistDoc,
+                addBy: TechnicalVistData.user_ref,
+                truckRef: TechnicalVistData.truck_ref
+            }))
+            promises.push(truckSnapShot.ref.set({
+                "technical_visit": TechnicalVistDoc,
+                "hasValidTechnicalVisit": true,
+            }, { merge: true }))
+            // change status of car on driver document if truck currently have driver 
+            if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
+                promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
+                    let truckDataForDriver = {
+                        truck: {
+                            hasValidTechnicalVisit: true
+                        },
+                        hasValidTruck: false
+                    }
+                    if (driverSnapshot.data().truck.hasValidRegistrationCertificate && driverSnapshot.data().truck.hasAValidInsurrance) {
+                        truckDataForDriver.hasValidTruck = true
+                    }
+                    return driverSnapshot.ref.set(truckDataForDriver, { merge: true })
+                }))
+            }
+            promises.push(admin.database().ref(`/intents/add_technical_visit/${ref}/response`).ref.set({ code: 201 }))
             return Promise.all(promises)
         })
 
-    static listenAddInsurranceIntent = functions.database.ref('/intents/add_insurrance/{uid}/{ref}/finished')
-        .onUpdate(async (change, context) => {
-            const snapshot = change.after
+    static listenAddInsurranceIntent = functions.database.ref('/intents/add_insurrance/{ref}/finished')
+        .onCreate(async (snapshot, context) => {
             if (!snapshot.val())
                 return false
-            const uid = context.params.uid
             const ref = context.params.ref
 
-            const insurranceSnapshot = await admin.database().ref(`/intents/add_insurrance/${uid}/${ref}`).once('value')
+            const insurranceSnapshot = await admin.database().ref(`/intents/add_insurrance/${ref}`).once('value')
             const insurranceData = insurranceSnapshot.val()
-            if (!Trucks.isValidInsurrance(insurranceData))
-                // format response and put into rtdb
-                return false
-            const truckSnapShot = await Trucks.getDoc(insurranceData.truck_id)
-            //check if user is trucks owner
-            if (truckSnapShot.data().owner_uid !== Users.getRef(uid))
-                // format response and put into rtdb
-                return false
+
+            const truckSnapShot = await Trucks.getDocByRef(insurranceData.truck_ref)
+            const repSnapShot = await Users.getDocByRef(insurranceData.user_ref)
+
+            if (!truckSnapShot.data())
+                return admin.database().ref(`/intents/add_insurrance/${ref}/response`).ref.set({ code: 404 })
+            if (truckSnapShot.data().immatriculation.toLocaleLowerCase() !== insurranceData.immatriculation.toLocaleLowerCase())
+                return admin.database().ref(`/intents/add_insurrance/${ref}/response`).ref.set({ code: 403 })
+            if (!repSnapShot.data().is_ezy_rep)
+                return admin.database().ref(`/intents/add_insurrance/${ref}/response`).ref.set({ code: 401 })
             const promises = []
             //move images to new endpoint 
-            const front_image_path = insurranceData.FRONT_IMAGE_URL.path
-            const back_image_path = insurranceData.BACK_IMAGE_URL.path
-            const FRONT_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${front_image_path.split("/").pop()}`
-            const BACK_IMAGE_MV_PATH = `/trucks/${uid}/${truckSnapShot.id}/${back_image_path.split("/").pop()}`
-            promises.push(File.moveFileFromTo(front_image_path, FRONT_IMAGE_MV_PATH))
-            promises.push(File.moveFileFromTo(back_image_path, BACK_IMAGE_MV_PATH))
+            let image_path = insurranceData.image_url
+            image_path = image_path.split("?")[0]
+            const IMAGE_MV_PATH = `/trucks/${ref}/${truckSnapShot.id}/${image_path.split("/").pop()}`
+            promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH))
             // create tv doc
             const insurranceDoc = {
-                frontImageUrl: FRONT_IMAGE_MV_PATH,
-                backImageUrl: BACK_IMAGE_MV_PATH,
-                expirationDate: insurranceData.expirationDate,
+                imageUrl: IMAGE_MV_PATH,
+                expirationDate: insurranceData.expiration_date,
                 date: insurranceData.date,
+                attestationNumber: insurranceData.attestation_number,
+                provider: insurranceData.provider,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
             }
             console.log(insurranceDoc)
             // store it to firestore
-            promises.push(admin.firestore().collection(Trucks.getRef(truckSnapShot.id) + 'insurrance').add(insurranceDoc))
-            promises.push(admin.database().ref(`/intents/add_insurrance/${uid}/${ref}`).remove())
+            promises.push(admin.firestore().collection(truckDocumentsPath + '/insurrances').add({
+                ...insurranceDoc,
+                addBy: insurranceData.user_ref,
+                truckRef: insurranceData.truck_ref
+            }))
+            promises.push(truckSnapShot.ref.set({
+                "insurrance": insurranceDoc,
+                "hasAValidInsurrance": true,
+            }, { merge: true }))
+            // change status of car on driver document if truck currently have driver 
+            if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
+                promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
+                    let truckDataForDriver = {
+                        truck: {
+                            hasAValidInsurrance: true
+                        },
+                        hasValidTruck: false
+                    }
+                    if (driverSnapshot.data().truck.hasValidTechnicalVisit && driverSnapshot.data().truck.hasValidRegistrationCertificate) {
+                        truckDataForDriver.hasValidTruck = true
+                    }
+                    return driverSnapshot.ref.set(truckDataForDriver, { merge: true })
+                }))
+            }
+            promises.push(admin.database().ref(`/intents/add_insurrance/${ref}/response`).ref.set({ code: 201 }))
+            return Promise.all(promises)
+        })
+
+    static listenAddRegistrationCertificateIntent = functions.database.ref('/intents/add_registration_certificate/{ref}/finished')
+        .onCreate(async (snapshot, context) => {
+            if (!snapshot.val())
+                return false
+            const ref = context.params.ref
+
+            const registrationCertificateSnapshot = await admin.database().ref(`/intents/add_registration_certificate/${ref}`).once('value')
+            const registrationCertificateData = registrationCertificateSnapshot.val()
+
+            const truckSnapShot = await Trucks.getDocByRef(registrationCertificateData.truck_ref)
+            const repSnapShot = await Users.getDocByRef(registrationCertificateData.user_ref)
+
+            if (!truckSnapShot.data())
+                return admin.database().ref(`/intents/add_registration_certificate/${ref}/response`).ref.set({ code: 404 })
+            if (truckSnapShot.data().immatriculation.toLocaleLowerCase() !== registrationCertificateData.immatriculation.toLocaleLowerCase())
+                return admin.database().ref(`/intents/add_registration_certificate/${ref}/response`).ref.set({ code: 403 })
+            if (!repSnapShot.data().is_ezy_rep)
+                return admin.database().ref(`/intents/add_registration_certificate/${ref}/response`).ref.set({ code: 401 })
+            const promises = []
+            //move images to new endpoint 
+            let image_path = registrationCertificateData.image_url
+            image_path = image_path.split("?")[0]
+            const IMAGE_MV_PATH = `/trucks/${ref}/${truckSnapShot.id}/${image_path.split("/").pop()}`
+            promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH))
+            // create tv doc
+            const registrationCertificateDoc = {
+                imageUrl: IMAGE_MV_PATH,
+                expirationDate: registrationCertificateData.expiration_date,
+                date: registrationCertificateData.start_date,
+                recordNumber: registrationCertificateData.record_number,
+                serialNumber: registrationCertificateData.serial_number,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp()
+            }
+            console.log(registrationCertificateDoc)
+            // store it to firestore
+            promises.push(admin.firestore().collection(truckDocumentsPath + '/registration_certificates').add({
+                ...registrationCertificateDoc,
+                addBy: registrationCertificateData.user_ref,
+                truckRef: registrationCertificateData.truck_ref
+            }))
+            promises.push(truckSnapShot.ref.set({
+                "registration_certificate": registrationCertificateDoc,
+                "hasValidRegistrationCertificate": true,
+            }, { merge: true }))
+            // change status of car on driver document if truck currently have driver 
+            if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
+                promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
+                    let truckDataForDriver = {
+                        truck: {
+                            hasValidRegistrationCertificate: true
+                        },
+                        hasValidTruck: false
+                    }
+                    if (driverSnapshot.data().truck.hasValidTechnicalVisit && driverSnapshot.data().truck.hasAValidInsurrance) {
+                        truckDataForDriver.hasValidTruck = true
+                    }
+                    return driverSnapshot.ref.set(truckDataForDriver, { merge: true })
+                }))
+            }
+            promises.push(admin.database().ref(`/intents/add_registration_certificate/${ref}/response`).ref.set({ code: 201 }))
             return Promise.all(promises)
         })
 }
