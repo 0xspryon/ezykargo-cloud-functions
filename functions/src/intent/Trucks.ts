@@ -708,7 +708,7 @@ export class TrucksIntent {
             const TechnicalVistDoc = {
                 imageUrl: IMAGE_MV_PATH,
                 expirationDate: TechnicalVistData.expiration_date,
-                date: TechnicalVistData.start_date,
+                date: TechnicalVistData.date,
                 recordNumber: TechnicalVistData.record_number,
                 serialNumber: TechnicalVistData.serial_number,
                 createdAt: FieldValue.serverTimestamp(),
@@ -772,7 +772,7 @@ export class TrucksIntent {
             const insurranceDoc = {
                 imageUrl: IMAGE_MV_PATH,
                 expirationDate: insurranceData.expiration_date,
-                date: insurranceData.start_date,
+                date: insurranceData.date,
                 attestationNumber: insurranceData.attestation_number,
                 provider: insurranceData.provider,
                 createdAt: FieldValue.serverTimestamp(),
