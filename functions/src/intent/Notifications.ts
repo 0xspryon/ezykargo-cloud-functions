@@ -104,4 +104,18 @@ export class Notifications {
             })
             return callBackFunctionPromise
         });
+
+    static createGenericNotification = async (title_en, title_fr, message_en, message_fr, data, userRefKey) => {
+        return admin.database().ref('/intents/notification/generic')
+            .push({
+                title_en,
+                title_fr,
+                message_en,
+                message_fr,
+                data,
+                userRefKey,
+            })
+            .then(ignored => Promise.resolve('ok'))
+        // return 'ok'
+    }
 }

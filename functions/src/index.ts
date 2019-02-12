@@ -36,7 +36,7 @@ export const listenMarkAsCompleted = FreightagesIntent.listenMarkAsCompleted
 //bargain
 export const listenAddBargainerOnRTDB = BargainsIntent.listenAddBargainerOnRTDB
 export const listenHireDriversOnRTDB = BargainsIntent.listenHireDriversOnRTDB
-export const listenPostResponseForHireDriver = BargainsIntent.listenPostResponseForHireDriver
+export const listenPostResponseForHireDriver = BargainsIntent.listenAcceptHireRequest
 
 //Pickups
 export const listenMarkAsPickup = PickupsIntent.listenMarkAsPickup
@@ -53,7 +53,8 @@ export const api = webApi;
 
 //Wecashup intergration.
 export const onPayment = Finances.onPayment
-export const onPaymentCallBack = Finances.onPaymentCallBack
+export const onWithdraw = Finances.onWithdraw
+export const onWithdrawWebhook = Finances.onWithdrawWebhook
 export const onPaymentWebhook = Finances.onPaymentWebhook
 export const onTransactionCode = Finances.onTransactionCode
 

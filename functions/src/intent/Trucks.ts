@@ -425,7 +425,7 @@ export class TrucksIntent {
 
                     return firestore.doc(dissociateDriverDataSnapshot.driverRef).get()
                         .then(driverSnapShot => {
-                            const NUMBER_OF_NOTIFICATION_DAYS_TO_ACTUAL_DISSOCIATION = 7;
+                            // const NUMBER_OF_NOTIFICATION_DAYS_TO_ACTUAL_DISSOCIATION = 7;
                             if (dissociateDriverDataSnapshot.driverRef !== "N/A" && !driverSnapShot.exists) {
                                 snapshot.ref.child("response").set({ code: 404 })
                                 return false
@@ -728,7 +728,7 @@ export class TrucksIntent {
             // change status of car on driver document if truck currently have driver 
             if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
                 promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
-                    let truckDataForDriver = {
+                    const truckDataForDriver = {
                         truck: {
                             hasValidTechnicalVisit: true
                         },
@@ -792,7 +792,7 @@ export class TrucksIntent {
             // change status of car on driver document if truck currently have driver 
             if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
                 promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
-                    let truckDataForDriver = {
+                    const truckDataForDriver = {
                         truck: {
                             hasAValidInsurrance: true
                         },
@@ -856,7 +856,7 @@ export class TrucksIntent {
             // change status of car on driver document if truck currently have driver 
             if (truckSnapShot.data().hasCurrentDriver && truckSnapShot.data().driver_ref) {
                 promises.push(Users.getDocByRef(truckSnapShot.data().driver_ref).then((driverSnapshot) => {
-                    let truckDataForDriver = {
+                    const truckDataForDriver = {
                         truck: {
                             hasValidRegistrationCertificate: true
                         },

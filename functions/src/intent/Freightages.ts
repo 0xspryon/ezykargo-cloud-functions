@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { File } from '../utils/File';
-import { Freightages, Users } from '../models';
+import { Freightages } from '../models';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 export class FreightagesIntent {
@@ -93,7 +93,7 @@ export class FreightagesIntent {
                                     freightagesList.set({ freightagesCount }, { merge: true })
                                         .then(() => {
                                             // inscrement number of freigt in rtdb
-                                            let departure_date = freightageData.departure_date
+                                            const departure_date = freightageData.departure_date
                                             realtimeDatabase
                                                 .ref(`/cities/${freightageData.addressFrom.mLocality}/${departure_date}/${freightageData.addressTo.mLocality}`)
                                                 .once("value", (cityvalue) => {

@@ -2,7 +2,6 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { File } from '../utils/File';
 import { Transactions } from '../models/transactions';
-const FieldValue = require('firebase-admin').firestore.FieldValue;
 import MomoProviders from './../models/MomoProviders'
 import { PhonenumberUtils } from '../utils/PhonenumberUtils';
 import { MobileMoneyProviders } from '../models/MobileMoneyProviders';
@@ -11,7 +10,7 @@ import { DeleteAccount } from '../models/intents/DeleteAccount';
 import { CryptoUtils } from '../utils/CryptoUtils';
 import { UpdateProfileImage } from '../models/intents/UpdateProfileImage';
 import { UpdateTransactionCode } from '../models/intents/UpdateTransactionCode';
-
+const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 /*
 * responses are given here following the http response codes as per the following link.
@@ -22,6 +21,7 @@ export class Auth {
     static FORBIDDEN = 403;
     static CONFLICT = 409;
     static UNPROCESSABLE_ENTITY = 422;
+    static DEFAULT_COMMISSION_PRICE = 500; //fcfa
 
     static onSignUpComplete = functions.database.ref('/intents/sign_up/{auuid}/finished')
         .onCreate((snapshot, context) => {
@@ -102,8 +102,6 @@ export class Auth {
                                     })
                                 )
                                 const referrerRef = userData.user_info.referrerRef
-                                console.log({ referrerRef })
-
                                 if (referrerRef)
                                     innerPromise.push(
                                         firestoreDb.collection(`${referrerRef}/referred_ones`)
@@ -111,43 +109,64 @@ export class Auth {
                                             .then((ref) => {
                                                 console.log({ ref: ref.path })
                                                 return firestoreDb.doc(`${Transactions.getRefMoneyAccount(firestoreDb.doc(referrerRef).id)}`).get()
-                                                    .then(referrerMoneyAccountDataSnapshot => {
+                                                    .then(async referrerMoneyAccountDataSnapshot => {
+                                                        let referralCommissionPrice = 0
+
                                                         let referredOnes = 1;
                                                         if (referrerMoneyAccountDataSnapshot.exists) {
                                                             referredOnes = +referrerMoneyAccountDataSnapshot.get('referred_ones_count')
                                                             referredOnes++
                                                         }
+
+                                                        if (referrerMoneyAccountDataSnapshot.exists) {
+                                                            await new Promise((resolve, reject) => {
+                                                                admin.database().ref('/params/referral_commission_rate')
+                                                                    .orderByChild('max_quantity').startAt(referredOnes)
+                                                                    .limitToFirst(1).once('value', querySnapshot => {
+                                                                        querySnapshot.forEach(referralSnapshot => {
+                                                                            const data = referralSnapshot.val()
+                                                                            console.log({ data })
+                                                                            referralCommissionPrice = data.price
+                                                                            resolve()
+                                                                            return true
+                                                                        })
+                                                                    })
+                                                            })
+                                                        }
+
+                                                        innerPromise.push(
+                                                            firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
+                                                                .set({
+                                                                    balance: 0,
+                                                                    escrowTotal: 0,
+                                                                    withdrawCount: 0,
+                                                                    depositCount: 0,
+                                                                    referred_ones_count: 0,
+                                                                    referalCommissionCount: 0,
+                                                                    referralCommissionPrice,
+                                                                    referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
+                                                                })
+                                                                .then(() => {
+                                                                    return firestoreDb.doc(Transactions.moneyAccount).get()
+                                                                        .then(docSnapshot => {
+                                                                            let count = 1
+                                                                            if (docSnapshot.exists) {
+                                                                                count = +docSnapshot.get('count')
+                                                                                count++
+                                                                                return docSnapshot.ref.update({ count })
+                                                                            }
+                                                                            return docSnapshot.ref.set({ count })
+                                                                        })
+                                                                })
+                                                                .catch(err => Promise.reject(err))
+                                                        )
+
                                                         return referrerMoneyAccountDataSnapshot.ref.set({ referred_ones_count: referredOnes }, { merge: true })
                                                     })
                                             }
                                             )
                                             .catch(errOnCollectionAdd => { console.log({ errOnCollectionAdd }) })
                                     )
-
-                                innerPromise.push(
-                                    firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
-                                        .set({
-                                            balance: 0,
-                                            withdrawCount: 0,
-                                            depositCount: 0,
-                                            referred_ones_count: 0,
-                                            referalCommissionCount: 0,
-                                            referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
-                                        })
-                                        .then(() => {
-                                            return firestoreDb.doc(Transactions.moneyAccount).get()
-                                                .then(docSnapshot => {
-                                                    let count = 1
-                                                    if (docSnapshot.exists) {
-                                                        count = +docSnapshot.get('count')
-                                                        count++
-                                                        return docSnapshot.ref.update({ count })
-                                                    }
-                                                    return docSnapshot.ref.set({ count })
-                                                })
-                                        })
-                                        .catch(err => Promise.reject(err))
-                                )
                                 innerPromise.push(
                                     db.ref(`/users/${auuid}`).set(userRef.path)
                                 )
@@ -290,7 +309,7 @@ export class Auth {
                 .then(userDoc => new Promise((resolve, reject) => {
                     const userData = userDoc.data()
                     const { avatarUrl } = userData;
-                    let splits = avatarUrl.split('/')
+                    const splits = avatarUrl.split('/')
                     splits.splice(splits.length - 1, 1)
                     splits.push(`${intent.imageStorageRef.split('/').pop()}`)
                     const newImagePath = `${splits.join('/')}`
@@ -401,13 +420,12 @@ export class Auth {
                         if (encryptedTransactionCode === userData.transaction_pin_code) {
 
                             const newEncryptedTransactionCode = await CryptoUtils.encrypt(intent.newTransactionCode, 'secret_key_here')
-                            const promisses = [];
                             return userSnapshot.ref.set(
                                 { transaction_pin_code: newEncryptedTransactionCode },
                                 { merge: true }
                             )
-                            .then(() => snapshot.ref.child('response').set({ code: 200 }))
-                            .catch(() => snapshot.ref.child('response').set({ code: 500 }))
+                                .then(() => snapshot.ref.child('response').set({ code: 200 }))
+                                .catch(() => snapshot.ref.child('response').set({ code: 500 }))
                         }
                         return snapshot.ref.child('response').set({ code: 401 })
                     });
