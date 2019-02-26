@@ -57,6 +57,7 @@ export const onWithdraw = Finances.onWithdraw
 export const onWithdrawWebhook = Finances.onWithdrawWebhook
 export const onPaymentWebhook = Finances.onPaymentWebhook
 export const onTransactionCode = Finances.onTransactionCode
+export const payMoneyInEscrow = Finances.payMoneyInEscrow
 
 //Notifications
 export const onDepositNotification = Notifications.onDeposit

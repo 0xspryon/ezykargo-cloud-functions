@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { Referrals } from './Referrals';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 const rp = require('request-promise');
 
@@ -9,8 +10,13 @@ const rp = require('request-promise');
 */
 export class Finances {
     static FORBIDDEN = 403;
+    static EZYKARGO_REFERRER = 'EZYKARGO';
     static CONFLICT = 409;
     static UNPROCESSABLE_ENTITY = 422;
+    static ezyowner = 'ezyowner';
+    static ezybiz = 'ezybiz';
+    static ezytrucker = 'ezytrucker';
+    static TON_TO_KILO_DIVISOR = 1000;
 
     static onPaymentWebhook = functions.https.onRequest((req, res) => {
         res.set('Access-Control-Allow-Origin', '*');
@@ -96,6 +102,7 @@ export class Finances {
                                                             amount: transaction_amount,
                                                             // type: Constants.TYPE_PAYMENT,
                                                             statusSuccess: true,
+                                                            operatorApplication: Finances.ezybiz
                                                         })
                                                         .then(ignored2 => res.status(200).end())
                                                     console.log({ flooredValue, fixed: flooredValue.toFixed(0) })
@@ -113,6 +120,7 @@ export class Finances {
                                     amount: transaction_amount,
                                     // type: Constants.TYPE_PAYMENT,
                                     statusSuccess: false,
+                                    operatorApplication: Finances.ezybiz
                                 })
                                 .then(ignored2 => res.status(200).end())
                         }
@@ -199,6 +207,7 @@ export class Finances {
                                                             amount: transaction_amount,
                                                             // type: Constants.TYPE_PAYMENT,
                                                             statusSuccess: true,
+                                                            operatorApplication: Finances.ezybiz
                                                         })
                                                         .then(ignored2 => res.status(200).end())
                                                     console.log({ flooredValue, fixed: flooredValue.toFixed(0) })
@@ -216,6 +225,7 @@ export class Finances {
                                     amount: transaction_amount,
                                     // type: Constants.TYPE_PAYMENT,
                                     statusSuccess: false,
+                                    operatorApplication: Finances.ezybiz
                                 })
                                 .then(ignored2 => res.status(200).end())
                         }
@@ -439,6 +449,7 @@ export class Finances {
                                 amount,
                                 // type: Constants.TYPE_PAYMENT,
                                 statusSuccess: false,
+                                operatorApplication: Finances.ezybiz
                             })
                             .then(ignored => {
                                 change.after.ref.child('response')
@@ -467,6 +478,7 @@ export class Finances {
                         account_balance: balance,
                         amount_in_escrow: amountToBePutInEscrow,
                         referenceString,
+                        timestamp: FieldValue.serverTimestamp(),
                     }
                 )
                 batch.update(
@@ -533,4 +545,243 @@ export class Finances {
         }
 
     }
+
+    static payMoneyInEscrow = functions.database.ref('/intents/freightage_complete/{timestamp}/{push_id}')
+        .onCreate(async (snapshot, context) => {
+            const { escrowRef: escrowRefString, freightageref } = snapshot.val()
+            const firestore = admin.firestore()
+            const escrowRef = firestore.doc(escrowRefString)
+            const escrowSnapshot = await escrowRef.get()
+            if (escrowSnapshot.exists) {
+                const { amount_in_escrow, referenceString } = escrowSnapshot.data()
+                /* once the data gotten, delete the escrow in question to avoid concurrent executions
+                *  of this function on the same escrow which can bring in race conditions 
+                */
+                escrowSnapshot.ref.delete()
+                const freightageSnapshot = await firestore.doc(referenceString).get()
+                const { amount: frieghtageRequestPrice, drivers } = freightageSnapshot.data()
+
+                // let selectedDriverRefString;
+                const driverData = drivers.map(driverDatum => {
+                    let totalWeight = 0;
+                    driverDatum.items.forEach(item => {
+                        const { carrying_quantity, weight } = item
+                        totalWeight += (carrying_quantity * weight)
+                    })
+                    const priceToBePaid = (totalWeight * frieghtageRequestPrice) / Finances.TON_TO_KILO_DIVISOR
+                    return ({
+                        priceToBePaid,
+                        driverRefString: driverDatum.driverRef,
+                        // truckRef: driverData.truckRef,
+                    })
+                })
+
+                return new Promise(async (resolve, reject) => {
+                    const ezyBizMoneyAccountSnapshot = await escrowSnapshot.ref.parent.parent.get()
+                    const {
+                        balance,
+                        escrowTotal,
+                        referrerRef: ezyBizReferrerRefString,
+                    } = ezyBizMoneyAccountSnapshot.data()
+
+                    const newBalance = balance - amount_in_escrow;
+                    const newEscrowTotal = escrowTotal - amount_in_escrow;
+
+                    //send commission of ezybiz referrer
+                    const promises = []
+                    if (ezyBizReferrerRefString !== Finances.EZYKARGO_REFERRER) {
+                        promises.push(
+                            Referrals.cutReferralCommission(
+                                `/bucket/usersList/users/${ezyBizMoneyAccountSnapshot.ref.id}`
+                            )
+                        )
+                    }
+
+                    //pay drivers, owners and their respective referrers
+                    driverData.map(driverDatum => {
+                        const driverRef = firestore.doc(driverDatum.driverRefString)
+                        promises.push(
+                            driverRef.get()
+                                .then(driverSnasphot => {
+                                    const subPromises = []
+                                    const { referrerRef: driverRefererRefString, truck } = driverSnasphot.data();
+                                    if (driverRefererRefString !== Finances.EZYKARGO_REFERRER) {
+                                        subPromises.push(
+                                            Referrals.cutReferralCommission(`/bucket/usersList/users/${driverSnasphot.ref.id}`)
+                                        )
+                                    }
+                                    const driverMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${driverSnasphot.ref.id}`)
+                                    const driverPriceToBePaidShare = (driverData.priceToBePaid * truck.percentage) / 100
+                                    subPromises.push(
+                                        firestore.runTransaction(t => {
+                                            return t.get(driverMoneyAccountRef)
+                                                .then(driverMoneyAccountSnapshot => {
+                                                    const { balance: driverMoneyAccountBalance } = driverMoneyAccountSnapshot.data()
+                                                    t.update(
+                                                        driverMoneyAccountRef,
+                                                        { balance: driverMoneyAccountBalance + driverPriceToBePaidShare }
+                                                    )
+                                                })
+                                        })
+                                    )
+                                    subPromises.push(driverMoneyAccountRef.collection('transactions').add({
+                                        type: 'payment',
+                                        amount: driverDatum.priceToBePaid,
+                                        timestamp: FieldValue.serverTimestamp(),
+                                    }))
+
+                                    const ownerRef = firestore.doc(truck.ownerRef)
+                                    const ownerMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${ownerRef.id}`)
+                                    const ownerPriceToBePaidShare = (driverData.priceToBePaid * (100 - truck.percentage)) / 100
+                                    subPromises.push(
+                                        firestore.runTransaction(t => {
+                                            return t.get(ownerMoneyAccountRef)
+                                                .then(async ownerMoneyAccountSnapshot => {
+                                                    const { balance: ownerMoneyAccountBalance, referrerRef: ezyownerReferrerRefString } = ownerMoneyAccountSnapshot.data()
+                                                    t.update(
+                                                        ownerMoneyAccountSnapshot.ref,
+                                                        { balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare }
+                                                    )
+                                                    return Promise.resolve(ezyownerReferrerRefString)
+                                                })
+                                        })
+                                            .then(ezyownerReferrerRefString => {
+                                                if (driverRefererRefString !== Finances.EZYKARGO_REFERRER) {
+                                                    return Referrals.cutReferralCommission(ezyownerReferrerRefString)
+                                                }
+                                                return Promise.resolve('ok')
+                                            })
+                                            .catch(err => console.log({ err }))
+                                    )
+
+                                    subPromises.push(ownerMoneyAccountRef.collection('transactions').add({
+                                        type: 'payment',
+                                        amount: ownerPriceToBePaidShare,
+                                        timestamp: FieldValue.serverTimestamp(),
+                                    }))
+                                    return Promise.all(subPromises)
+                                }))
+                    })
+
+
+
+                    //deduce account of ezybiz.
+                    ezyBizMoneyAccountSnapshot.ref.set(
+                        {
+                            balance: newBalance,
+                            escrowTotal: newEscrowTotal,
+                        },
+                        { merge: true }
+                    )
+
+                    //setting ezykargoPlatformEzybizReferralCommission
+                    const ezyKargoPlatformEzybizCommission = amount_in_escrow - frieghtageRequestPrice
+                    promises.push(
+                        Finances.addEzyKargoPlatformTransaction(ezyKargoPlatformEzybizCommission, `firestoreRef : ${freightageSnapshot.ref}`)
+                    )
+                    return Promise.all(promises)
+                })
+            }
+            else return Promise.reject("The escrow in question doesn't exist. Seems like he overpressed a button")
+        })
+
+    /*
+    * @params:
+    * -amount: greater than zero value
+    * -decriment: whether the amount should be decrimented from the platform if true and otherwise if false
+    * @return
+    * -Promise<{}>
+    */
+    public static addEzyKargoPlatformTransaction = async (amount, reason, decrement = false) => {
+        let actualAmount = amount
+        if (decrement) actualAmount = -actualAmount
+        const accountRef = admin.database().ref('z-platform/statistics/finances')
+        accountRef.child('pending_transactions').push({
+            amount,
+            shouldIncrement: !decrement,
+            reason,
+        })
+    }
+
+    static transactionCalculatorCron = functions.https.onRequest((req, res) => {
+        res.set('Access-Control-Allow-Origin', '*');
+
+        if (req.method === 'OPTIONS') {
+            res.set('Access-Control-Allow-Methods', 'GET');
+            res.set('Access-Control-Allow-Headers', 'Content-Type');
+            res.set('Access-Control-Max-Age', '3600');
+            res.status(204).send('');
+        }
+        else {
+            const rtdb = admin.database()
+            const firestoreDb = admin.firestore()
+            const promises = []
+            console.log({ requestBody: req.body })
+
+            const accountRef = rtdb.ref('z-platform/statistics/finances')
+            accountRef.child('pending_transactions').once('value', pendingTransactionsListSnapshot => {
+                let TotalAmountToSave = 0;
+                const transactionsToBeLogged = []
+                let platformBalanceBefore;
+                let platformBalanceAfter;
+
+                pendingTransactionsListSnapshot.forEach(transactionSnapshot => {
+                    const { amount, shouldIncrement, reason } = transactionSnapshot.val()
+                    let actualAmount = amount
+                    if (!shouldIncrement) actualAmount = -amount
+                    TotalAmountToSave += actualAmount
+                    transactionsToBeLogged.push({
+                        amount,
+                        shouldIncrement,
+                        reason,
+                    })
+                    transactionSnapshot.ref.remove()
+                    return true;
+                })
+                promises.push(accountRef.transaction(financesAccount => {
+                    if (financesAccount) {
+                        const { ezykargo_balance } = financesAccount
+                        platformBalanceBefore = ezykargo_balance
+                        platformBalanceAfter = TotalAmountToSave + ezykargo_balance
+                        return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
+                    } else {
+                        platformBalanceAfter = TotalAmountToSave
+                        return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
+                    }
+                }))
+                const docRef = firestoreDb.collection('bucket/finances/savedTransactions/').doc()
+                promises.push(
+                    docRef.set({
+                        timeStamp: admin.firestore.FieldValue.serverTimestamp(),
+                        balanceBefore: platformBalanceBefore,
+                        balanceAfter: platformBalanceAfter,
+                        TotalAmountToSave,
+                        transactionsToBeLogged,
+                        path: docRef.path,
+                    })
+
+                )
+                Promise.all(promises)
+                    .then(() => {
+
+                        return res.status(200).json({ status: 'ok' })
+                    })
+                    .catch(err => {
+                        console.log({ err, path: docRef.path })
+                        rtdb.ref('z-platform/statistics/errors')
+                            .push({
+                                message: 'error at saving platform balance.',
+                                balanceBefore: platformBalanceBefore,
+                                balanceAfter: platformBalanceAfter,
+                                TotalAmountToSave,
+                                transactionsToBeLogged,
+                                path: docRef.path,
+                            })
+                            .then(ignored => {
+                                return res.status(200).json({ status: 'ok' })
+                            })
+                    })
+            })
+        }
+    })
 }

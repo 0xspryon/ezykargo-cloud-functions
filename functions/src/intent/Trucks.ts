@@ -546,14 +546,6 @@ export class TrucksIntent {
                             isDisabled: false,
                             isDeleted: false
                         }
-                        // if (truckData.driver_ref !== "N/A") {
-                        //     truckDoc.hasCurrentDriver = true
-                        //     truckDoc.driver = {
-                        //         fullName: truckData.driverFullName,
-                        //         ref: truckData.driver_ref,
-                        //     }
-                        //     truckDoc[`driverCount`] = 1;
-                        // }
                         const uid = truckData.userRef.split("/").pop()
 
                         console.log('saving images now')

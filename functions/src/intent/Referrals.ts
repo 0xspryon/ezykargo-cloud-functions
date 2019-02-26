@@ -13,7 +13,7 @@ export class Referrals {
     *-send notification to referrer about the referral transaction.
     */
     static cutReferralCommission = async (referredUserReference) => {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const firestore = admin.firestore()
             const db = admin.database()
 
@@ -27,7 +27,6 @@ export class Referrals {
 
             const referrerReference = firestore.doc(referrerRef)
             const referrerMoneyAccount = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${referrerReference.id}`)
-            const referrerMoneyAccountSnapshot = await userMoneyAccountRef.get()
             db.ref('z-platform/statistics/finances')
                 .once('value', financesAccountSnapshot => {
                     if (financesAccountSnapshot.exists) {
@@ -43,8 +42,14 @@ export class Referrals {
                 amount: referralCommissionPrice,
                 timestamp: FieldValue.serverTimestamp(),
             })
-            const { balance } = referrerMoneyAccountSnapshot.data()
-            referrerMoneyAccountSnapshot.ref.set({ balance: balance + referralCommissionPrice }, { merge: true })
+            const referrerMoneyAccountRef = firestore.doc(referrerRef)
+            await firestore.runTransaction(t => {
+                return t.get(referrerMoneyAccountRef)
+                    .then(referrerMoneyAccountSnapshot => {
+                        const { balance } = referrerMoneyAccountSnapshot.data()
+                        t.update(referrerMoneyAccountSnapshot.ref, { balance: balance + referralCommissionPrice })
+                    })
+            })
 
             userMoneyAccountSnapshot.ref.set({ referralCommissionCount: referralCommissionCount + 1 }, { merge: true })
             Notifications.createGenericNotification(
@@ -60,7 +65,6 @@ export class Referrals {
         })
     }
 
-    static messageBodyEn = (price, fullname, count) => `You've received ${price} CFA for having referred ${fullname}./n This is his ${count} transaction on Ezykargo`,
-
-    static messageBodyFr = (price, fullname, count) => `Vous avez recu ${price} CFA pour avoir referrer ${fullname}./n Ceci lui fait ${count} transactions sur la plateform Ezykargo`,
+    static messageBodyEn = (price, fullname, count) => `You've received ${price} CFA for having referred ${fullname}./n This is his ${count} transaction on Ezykargo`
+    static messageBodyFr = (price, fullname, count) => `Vous avez recu ${price} CFA pour avoir referrer ${fullname}./n Ceci lui fait ${count} transactions sur la plateform Ezykargo`
 }
