@@ -34,7 +34,6 @@ export class Referrals {
       const referrerMoneyAccount = firestore.doc(
         `/bucket/moneyAccount/moneyAccounts/${referrerReference.id}`
       );
-      const referrerMoneyAccountSnapshot = await userMoneyAccountRef.get();
       db.ref("z-platform/statistics/finances").once(
         "value",
         financesAccountSnapshot => {
@@ -56,11 +55,17 @@ export class Referrals {
         amount: referralCommissionPrice,
         timestamp: FieldValue.serverTimestamp()
       });
-      const { balance } = referrerMoneyAccountSnapshot.data();
-      referrerMoneyAccountSnapshot.ref.set(
-        { balance: balance + referralCommissionPrice },
-        { merge: true }
-      );
+      const referrerMoneyAccountRef = firestore.doc(referrerRef);
+      await firestore.runTransaction(t => {
+        return t
+          .get(referrerMoneyAccountRef)
+          .then(referrerMoneyAccountSnapshot => {
+            const { balance } = referrerMoneyAccountSnapshot.data();
+            t.update(referrerMoneyAccountSnapshot.ref, {
+              balance: balance + referralCommissionPrice
+            });
+          });
+      });
 
       userMoneyAccountSnapshot.ref.set(
         { referralCommissionCount: referralCommissionCount + 1 },
@@ -89,7 +94,6 @@ export class Referrals {
 
   static messageBodyEn = (price, fullname, count) =>
     `You've received ${price} CFA for having referred ${fullname}./n This is his ${count} transaction on Ezykargo`;
-
   static messageBodyFr = (price, fullname, count) =>
     `Vous avez recu ${price} CFA pour avoir referrer ${fullname}./n Ceci lui fait ${count} transactions sur la plateform Ezykargo`;
 }

@@ -109,7 +109,7 @@ export class TransactionsIntent {
                                     balance: 0,
                                     withdrawCount: 0,
                                     depositCount: 0,
-                                    referalCommissionCount: 0,
+                                    referralCommissionCount: 0,
                                 }
                             }
                             let newVal = {}

@@ -5,12 +5,12 @@ const fs = require('fs');
 
 export class File {
 
-    static moveFileFromTo = async (from,to) => {
-        console.log(from,to)
+    static moveFileFromTo = async (from, to) => {
+        console.log(from, to)
         // Download file from bucket.
         const fileName = from.split("/").pop()
         const bucket = admin.storage().bucket();
-        const tempFilePath = path.join(os.tmpdir(), ((new Date).getTime())+"-"+fileName);
+        const tempFilePath = path.join(os.tmpdir(), ((new Date).getTime()) + "-" + fileName);
         const file = bucket.file(from)
         return file.download({
             destination: tempFilePath,
@@ -19,8 +19,9 @@ export class File {
             return bucket.upload(tempFilePath, {
                 destination: to,
                 metadata: {
-                    'contentType' :file.metadata.contentType
+                    'contentType': file.metadata.contentType
                 },
+                resumable: false,
             });
         }).then(() => {
             fs.unlinkSync(tempFilePath)

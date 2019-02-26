@@ -102,6 +102,7 @@ export class Auth {
                                     })
                                 )
                                 const referrerRef = userData.user_info.referrerRef
+                                let referralCommissionPrice = 0
                                 if (referrerRef)
                                     innerPromise.push(
                                         firestoreDb.collection(`${referrerRef}/referred_ones`)
@@ -110,7 +111,6 @@ export class Auth {
                                                 console.log({ ref: ref.path })
                                                 return firestoreDb.doc(`${Transactions.getRefMoneyAccount(firestoreDb.doc(referrerRef).id)}`).get()
                                                     .then(async referrerMoneyAccountDataSnapshot => {
-                                                        let referralCommissionPrice = 0
 
                                                         let referredOnes = 1;
                                                         if (referrerMoneyAccountDataSnapshot.exists) {
@@ -134,32 +134,6 @@ export class Auth {
                                                             })
                                                         }
 
-                                                        innerPromise.push(
-                                                            firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
-                                                                .set({
-                                                                    balance: 0,
-                                                                    escrowTotal: 0,
-                                                                    withdrawCount: 0,
-                                                                    depositCount: 0,
-                                                                    referred_ones_count: 0,
-                                                                    referalCommissionCount: 0,
-                                                                    referralCommissionPrice,
-                                                                    referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
-                                                                })
-                                                                .then(() => {
-                                                                    return firestoreDb.doc(Transactions.moneyAccount).get()
-                                                                        .then(docSnapshot => {
-                                                                            let count = 1
-                                                                            if (docSnapshot.exists) {
-                                                                                count = +docSnapshot.get('count')
-                                                                                count++
-                                                                                return docSnapshot.ref.update({ count })
-                                                                            }
-                                                                            return docSnapshot.ref.set({ count })
-                                                                        })
-                                                                })
-                                                                .catch(err => Promise.reject(err))
-                                                        )
 
                                                         return referrerMoneyAccountDataSnapshot.ref.set({ referred_ones_count: referredOnes }, { merge: true })
                                                     })
@@ -167,6 +141,33 @@ export class Auth {
                                             )
                                             .catch(errOnCollectionAdd => { console.log({ errOnCollectionAdd }) })
                                     )
+                                innerPromise.push(
+                                    firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
+                                        .set({
+                                            balance: 0,
+                                            escrowTotal: 0,
+                                            withdrawCount: 0,
+                                            withdrawTotal: 0,
+                                            depositCount: 0,
+                                            referred_ones_count: 0,
+                                            referralCommissionCount: 0,
+                                            referralCommissionPrice,
+                                            referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
+                                        })
+                                        .then(() => {
+                                            return firestoreDb.doc(Transactions.moneyAccount).get()
+                                                .then(docSnapshot => {
+                                                    let count = 1
+                                                    if (docSnapshot.exists) {
+                                                        count = +docSnapshot.get('count')
+                                                        count++
+                                                        return docSnapshot.ref.update({ count })
+                                                    }
+                                                    return docSnapshot.ref.set({ count })
+                                                })
+                                        })
+                                        .catch(err => Promise.reject(err))
+                                )
                                 innerPromise.push(
                                     db.ref(`/users/${auuid}`).set(userRef.path)
                                 )

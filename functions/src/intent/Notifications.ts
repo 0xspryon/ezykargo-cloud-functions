@@ -18,10 +18,11 @@ export class Notifications {
                 amount,
                 userRefKey,
                 currency,
+                operatorApplication
             } = snapshot.val()
 
             const callBackFunctionPromise = new Promise((resolve, reject) => {
-                rtdb.ref(`/fcm/${userRefKey}`)
+                rtdb.ref(`/fcm/${operatorApplication}/${userRefKey}`)
                     .once('value', fcmTokenSnapshot => {
                         if (fcmTokenSnapshot.exists) {
                             const token = fcmTokenSnapshot.val()
@@ -68,10 +69,11 @@ export class Notifications {
                 message_fr,
                 data,
                 userRefKey,
+                operatorApplication
             } = snapshot.val()
 
             const callBackFunctionPromise = new Promise((resolve, reject) => {
-                rtdb.ref(`/fcm/${userRefKey}`)
+                rtdb.ref(`/fcm/${operatorApplication}/${userRefKey}`)
                     .once('value', fcmTokenSnapshot => {
                         if (fcmTokenSnapshot.exists) {
                             const token = fcmTokenSnapshot.val()
