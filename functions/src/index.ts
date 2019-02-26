@@ -39,7 +39,7 @@ export const listenHireDriversOnRTDB = BargainsIntent.listenHireDriversOnRTDB
 export const listenPostResponseForHireDriver = BargainsIntent.listenAcceptHireRequest
 
 //Pickups
-export const listenMarkAsPickup = PickupsIntent.listenMarkAsPickup
+export const listenMarkAsPickupNe = PickupsIntent.listenMarkAsPickup
 export const listenValidatePickup = PickupsIntent.listenValidatePickup
 
 //users
