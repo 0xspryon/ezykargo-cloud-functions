@@ -548,7 +548,8 @@ export class Finances {
 
     static payMoneyInEscrow = functions.database.ref('/intents/freightage_complete/{timestamp}/{push_id}')
         .onCreate(async (snapshot, context) => {
-            const { escrowRef: escrowRefString, freightageref } = snapshot.val()
+            // const { escrowRef: escrowRefString, freightageref } = snapshot.val()
+            const escrowRefString = snapshot.val()
             const firestore = admin.firestore()
             const escrowRef = firestore.doc(escrowRefString)
             const escrowSnapshot = await escrowRef.get()
