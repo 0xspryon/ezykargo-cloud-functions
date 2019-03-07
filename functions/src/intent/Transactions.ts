@@ -4,6 +4,7 @@ import { Transactions } from "../models";
 import {
   cloud_function_url_notification,
   placePayment,
+  checkPayment,
   serviceKey
 } from "../api";
 const FieldValue = require("firebase-admin").firestore.FieldValue;
@@ -127,16 +128,38 @@ export class TransactionsIntent {
       firestore
         .doc(data.payment_ref)
         .get()
-        .then(transactionDataSnapshot => {
+        .then(async transactionDataSnapshot => {
           if (!transactionDataSnapshot.exists) {
             reject(404);
-            return;
           }
           const transactionData = transactionDataSnapshot.data();
           const item_ref = data["item_ref"];
           delete data["service"];
           delete data["payment_ref"];
           delete data["item_ref"];
+
+          const options = {
+            method: "POST",
+            uri: checkPayment,
+            json: true,
+            body: {
+              paymentId: transactionData["paymentId"]
+            }
+          };
+
+          const confirmPayment = await rp(options);
+          if (!confirmPayment["transaction"]) reject("error");
+          switch (confirmPayment["transaction"]["status"]) {
+            case 1:
+              data.status = "success";
+              break;
+            case 0:
+              data.status = "failed";
+              break;
+            default:
+              data.status = "cancelled";
+              break;
+          }
           const userId = transactionData["user"].split("/").pop();
           firestore
             .doc(Transactions.getRefMoneyAccount(userId))
@@ -154,32 +177,33 @@ export class TransactionsIntent {
                 };
               }
               let newVal = {};
-              if (data.data === "success") {
+              if (data.status === "success") {
                 newVal = {
                   prevAmount: +account["balance"],
-                  newAmount: account["balance"] + transactionData
+                  newAmount: account["balance"] + data.amount
                 };
               }
               transactionDataSnapshot.ref
                 .set({ ...data, ...newVal }, { merge: true })
                 .then(() => {
-                  if (data.data === "failed") {
+                  if (data.status === "failed") {
                     realtimeDatabase
                       .ref(`${item_ref}`)
                       .ref.child("response")
                       .set({ code: 406 });
-                  } else if (data.data === "cancelled") {
+                  } else if (data.status === "cancelled") {
                     realtimeDatabase
                       .ref(`${item_ref}`)
                       .ref.child("response")
                       .set({ code: 412 });
-                  } else if (data.data === "success") {
+                  } else if (data.status === "success") {
                     if (dataSnapshot.exists) {
-                      transactionDataSnapshot.ref
+                      dataSnapshot.ref
                         .set(
                           {
                             ...account,
-                            balance: account["balance"] + transactionData
+                            balance: account["balance"] + data.amount,
+                            depositCount: +account["depositCount"] + 1
                           },
                           { merge: true }
                         )
@@ -191,10 +215,11 @@ export class TransactionsIntent {
                           resolve(202);
                         });
                     } else {
-                      transactionDataSnapshot.ref
+                      dataSnapshot.ref
                         .set({
                           ...account,
-                          balance: account["balance"] + transactionData
+                          balance: account["balance"] + data.amount,
+                          depositCount: +account["depositCount"] + 1
                         })
                         .then(() => {
                           realtimeDatabase

@@ -18,14 +18,14 @@ export const serviceSecret =
 
 const validIp = ["184.154.224.14", "184.154.224.222"];
 
-main.use("/api/v1", app);
+main.use("/v1", app);
 main.use(bodyParser.json());
 main.use(bodyParser.urlencoded({ extended: false }));
 
 app.post("/sE8BFAAE5EEABCA864224363759A55351B0DAA792C03.php", (req, res) => {
   const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
   if (validIp.indexOf(`${ip}`) === -1) {
-    res.send("error");
+    res.send("server incorrect");
     return;
   }
   const data = req.body;
