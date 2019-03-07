@@ -33,8 +33,12 @@ export class TransactionsIntent {
             return;
           }
           const userData = userDataSnapshot.data();
-          const transactionRef = firestore
-            .collection(Transactions.basePath)
+          const userMoneyAccountRef = firestore.doc(
+            `/bucket/moneyAccount/moneyAccounts/${userDataSnapshot.ref.id}`
+          );
+          console.log(userMoneyAccountRef);
+          const transactionRef = userMoneyAccountRef
+            .collection("transactions")
             .doc();
           const requestData = {
             service: serviceKey,
@@ -65,7 +69,7 @@ export class TransactionsIntent {
                 .set({
                   ...requestData,
                   ...result,
-                  createdAt: FieldValue.serverTimestamp(),
+                  timestamp: FieldValue.serverTimestamp(),
                   type: "deposit"
                 })
                 .then(() => {
