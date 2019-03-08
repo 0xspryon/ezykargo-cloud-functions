@@ -5,7 +5,9 @@ import {
   cloud_function_url_notification,
   placePayment,
   checkPayment,
-  serviceKey
+  payout,
+  serviceKey,
+  serviceSecret
 } from "../api";
 const FieldValue = require("firebase-admin").firestore.FieldValue;
 // const axios = require('axios');
@@ -80,21 +82,21 @@ export class TransactionsIntent {
                       .ref(`/intents/make_deposit/${timestamp}/${ref}/response`)
                       .ref.set({
                         code: 202,
-                        response: result
+                        ...result
                       });
                   } else if (result.status === "INVALID_MSISDN") {
                     realtimeDatabase
                       .ref(`/intents/make_deposit/${timestamp}/${ref}/response`)
                       .ref.set({
                         code: 400,
-                        response: result
+                        ...result
                       });
                   } else {
                     realtimeDatabase
                       .ref(`/intents/make_deposit/${timestamp}/${ref}/response`)
                       .ref.set({
                         code: 503,
-                        response: result
+                        ...result
                       });
                   }
                 })
@@ -112,6 +114,127 @@ export class TransactionsIntent {
                 .ref(`/intents/make_deposit/${timestamp}/${ref}/response/code`)
                 .ref.set(503);
             });
+        })
+        .catch(onrejected => {
+          console.log("Reject", onrejected);
+          realtimeDatabase
+            .ref(`/intents/make_deposit/${timestamp}/${ref}/response/code`)
+            .ref.set(404);
+        });
+    });
+
+  static listenMakeWithdrawal = functions.database
+    .ref("/intents/make_withdrawal/{timestamp}/{ref}")
+    .onCreate(async (snapshot, context) => {
+      const firestore = admin.firestore();
+      const realtimeDatabase = admin.database();
+
+      const ref = context.params.ref;
+      const timestamp = context.params.timestamp;
+
+      const data = snapshot.val();
+
+      firestore
+        .doc(data["userRef"])
+        .get()
+        .then(async userDataSnapshot => {
+          if (!userDataSnapshot.exists) {
+            realtimeDatabase
+              .ref(`/intents/make_withdrawal/${timestamp}/${ref}/response/code`)
+              .ref.set(404);
+            return;
+          }
+          const userData = userDataSnapshot.data();
+          const userMoneyAccountRef = firestore.doc(
+            `/bucket/moneyAccount/moneyAccounts/${userDataSnapshot.ref.id}`
+          );
+          console.log(userMoneyAccountRef);
+          const transactionRef = userMoneyAccountRef
+            .collection("transactions")
+            .doc();
+          const requestData = {
+            service_key: serviceKey,
+            service_secret: serviceSecret,
+            phonenumber: data["phoneNumber"] + "",
+            amount: data["amount"],
+            processing_number: transactionRef.path
+          };
+          if (data["operator"] && data["operator"] === "CM_EUMM") {
+            requestData["operator"] = "CM_EUMM";
+          }
+          console.log(requestData, payout);
+
+          let insufficientAmount = false;
+          let monetBilResult = {};
+          let resultTransaction = await firestore.runTransaction(t => {
+            return t
+              .get(userMoneyAccountRef)
+              .then(async moneyAccountDataSnapshot => {
+                const balance =
+                  moneyAccountDataSnapshot.data().balance -
+                  moneyAccountDataSnapshot.data().escrowTotal;
+                if (+balance <= +data["amount"]) {
+                  insufficientAmount = true;
+                  return false;
+                }
+                const options = {
+                  method: "POST",
+                  uri: payout,
+                  json: true,
+                  body: { ...requestData }
+                };
+                return rp(options)
+                  .then(result => {
+                    monetBilResult = result;
+                    if (!result.success) return false;
+                    return moneyAccountDataSnapshot.ref
+                      .set(
+                        {
+                          withdrawCount:
+                            moneyAccountDataSnapshot.data().withdrawCount + 1,
+                          balance:
+                            moneyAccountDataSnapshot.data().balance -
+                            +data["amount"]
+                        },
+                        { merge: true }
+                      )
+                      .then(val => true);
+                  })
+                  .catch(error => {
+                    monetBilResult = error;
+                    return false;
+                  });
+              });
+          });
+
+          if (resultTransaction) {
+            await transactionRef.set({
+              ...requestData,
+              ...monetBilResult,
+              timestamp: FieldValue.serverTimestamp(),
+              type: "withdrawal"
+            });
+            return realtimeDatabase
+              .ref(`/intents/make_withdrawal/${timestamp}/${ref}/response`)
+              .ref.set({
+                code: 200,
+                ...monetBilResult
+              });
+          } else if (insufficientAmount) {
+            return realtimeDatabase
+              .ref(`/intents/make_withdrawal/${timestamp}/${ref}/response`)
+              .ref.set({
+                code: 402,
+                ...monetBilResult
+              });
+          } else {
+            return realtimeDatabase
+              .ref(`/intents/make_withdrawal/${timestamp}/${ref}/response`)
+              .ref.set({
+                code: 503,
+                ...monetBilResult
+              });
+          }
         })
         .catch(onrejected => {
           console.log("Reject", onrejected);

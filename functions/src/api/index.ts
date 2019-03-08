@@ -12,6 +12,7 @@ export const cloud_function_url_notification =
 export const baseUrl = "https://api.monetbil.com/payment/v1/";
 export const placePayment = baseUrl + "placePayment";
 export const checkPayment = baseUrl + "checkPayment";
+export const payout = "https://api.monetbil.com/v1/payouts/withdrawal";
 export const serviceKey = "MkiGgmqZ0btHaB0rv7WbqiYv5WB3m4jy";
 export const serviceSecret =
   "lfO7ARbbMH4PNB6sBKkfYZv4F8ZudIo2JlgKZRWUwcBHpjJPyyokGn7MpRRvi2ys";

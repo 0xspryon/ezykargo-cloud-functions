@@ -65,7 +65,7 @@ export const listenAddReview = UsersIntent.listenAddReview;
 
 //payment
 export const listenMakePayment = TransactionsIntent.listenMakePayment;
-
+export const listenMakeWithdrawal = TransactionsIntent.listenMakeWithdrawal;
 //init API
 export const api = webApi;
 
