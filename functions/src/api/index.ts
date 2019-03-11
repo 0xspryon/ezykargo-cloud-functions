@@ -25,14 +25,16 @@ main.use(bodyParser.urlencoded({ extended: false }));
 
 app.post("/sE8BFAAE5EEABCA864224363759A55351B0DAA792C03.php", (req, res) => {
   const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-  if (validIp.indexOf(`${ip}`) === -1) {
-    res.send("server incorrect");
-    return;
-  }
+  // console.log(ip);
+  // if (validIp.indexOf(`${ip}`) === -1) {
+  //   res.send("server incorrect");
+  //   return;
+  // }
   const data = req.body;
+  console.log(data);
   TransactionsIntent.validatePayment(data)
     .then(() => {
-      res.send("success");
+      res.send("received");
     })
     .catch(() => {
       res.send("error");

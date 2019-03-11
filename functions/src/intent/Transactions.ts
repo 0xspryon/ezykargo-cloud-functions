@@ -180,8 +180,7 @@ export class TransactionsIntent {
                 const options = {
                   method: "POST",
                   uri: payout,
-                  json: true,
-                  body: { ...requestData }
+                  form: { ...requestData }
                 };
                 return rp(options)
                   .then(result => {
@@ -256,27 +255,30 @@ export class TransactionsIntent {
             reject(404);
           }
           const transactionData = transactionDataSnapshot.data();
+          if (transactionData.status !== "REQUEST_ACCEPTED") {
+            reject(409);
+          }
           const item_ref = data["item_ref"];
           delete data["service"];
           delete data["payment_ref"];
           delete data["item_ref"];
-
+          console.log(transactionData);
           const options = {
             method: "POST",
             uri: checkPayment,
-            json: true,
-            body: {
-              paymentId: transactionData["paymentId"]
+            form: {
+              paymentId: transactionData.paymentId
             }
           };
 
           const confirmPayment = await rp(options);
           if (!confirmPayment["transaction"]) reject("error");
+          console.log(confirmPayment);
           switch (confirmPayment["transaction"]["status"]) {
-            case 1:
+            case "1":
               data.status = "success";
               break;
-            case 0:
+            case "0":
               data.status = "failed";
               break;
             default:
@@ -284,6 +286,7 @@ export class TransactionsIntent {
               break;
           }
           const userId = transactionData["user"].split("/").pop();
+          console.log(data, userId);
           firestore
             .doc(Transactions.getRefMoneyAccount(userId))
             .get()
@@ -299,6 +302,7 @@ export class TransactionsIntent {
                   referralCommissionCount: 0
                 };
               }
+              console.log(account);
               let newVal = {};
               if (data.status === "success") {
                 newVal = {
