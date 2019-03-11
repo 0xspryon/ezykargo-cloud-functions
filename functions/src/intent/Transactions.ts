@@ -243,7 +243,8 @@ export class TransactionsIntent {
         });
     });
 
-  static validatePayment(data) {
+  static validatePayment(payload) {
+    let data = payload;
     return new Promise((resolve, reject) => {
       const firestore = admin.firestore();
       const realtimeDatabase = admin.database();
@@ -271,18 +272,20 @@ export class TransactionsIntent {
             }
           };
 
-          const confirmPayment = await rp(options);
-          if (!confirmPayment["transaction"]) reject("error");
+          const confirmPayment = JSON.parse(await rp(options));
           console.log(confirmPayment);
-          switch (confirmPayment["transaction"]["status"]) {
+          switch (confirmPayment.transaction.status) {
             case "1":
               data.status = "success";
               break;
             case "0":
               data.status = "failed";
               break;
-            default:
+            case "-1":
               data.status = "cancelled";
+              break;
+            default:
+              reject("error");
               break;
           }
           const userId = transactionData["user"].split("/").pop();
@@ -307,7 +310,7 @@ export class TransactionsIntent {
               if (data.status === "success") {
                 newVal = {
                   prevAmount: +account["balance"],
-                  newAmount: account["balance"] + data.amount
+                  newAmount: +account["balance"] + (+data.amount)
                 };
               }
               transactionDataSnapshot.ref
@@ -329,7 +332,7 @@ export class TransactionsIntent {
                         .set(
                           {
                             ...account,
-                            balance: account["balance"] + data.amount,
+                          balance: +account["balance"] + (+data.amount),
                             depositCount: +account["depositCount"] + 1
                           },
                           { merge: true }
@@ -361,6 +364,7 @@ export class TransactionsIntent {
             });
         })
         .catch(onrejected => {
+          console.log(onrejected);
           reject(500);
         });
     });

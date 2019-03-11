@@ -36,7 +36,8 @@ app.post("/sE8BFAAE5EEABCA864224363759A55351B0DAA792C03.php", (req, res) => {
     .then(() => {
       res.send("received");
     })
-    .catch(() => {
+    .catch(err => {
+      console.log(err);
       res.send("error");
     });
 });
