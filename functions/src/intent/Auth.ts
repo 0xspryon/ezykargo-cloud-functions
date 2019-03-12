@@ -10,6 +10,7 @@ import { DeleteAccount } from '../models/intents/DeleteAccount';
 import { CryptoUtils } from '../utils/CryptoUtils';
 import { UpdateProfileImage } from '../models/intents/UpdateProfileImage';
 import { UpdateTransactionCode } from '../models/intents/UpdateTransactionCode';
+import { Constants } from '../utils/Constants';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 /*
@@ -81,28 +82,29 @@ export class Auth {
                         ]
                     }
                     console.log(userDoc)
-                    const userListDocument = firestoreDb.doc("/bucket/usersList")
+                    const userListDocumentRef = firestoreDb.doc("/bucket/usersList")
                     promises.push(
-                        userListDocument.collection('users').add(userDoc)
+                        userListDocumentRef.collection('users').add(userDoc)
                             .then((userRef) => {
                                 const innerPromise = []
                                 innerPromise.push(
                                     firestoreDb.runTransaction(t => {
-                                        return t.get(userListDocument)
+                                        return t.get(userListDocumentRef)
                                             .then((usersListSnaphsot) => {
+                                                let count = 1
+                                                console.log({ userListdoc: usersListSnaphsot.data() })
                                                 if (usersListSnaphsot.exists) {
                                                     const data = usersListSnaphsot.data();
-                                                    const count = data.userCount + 1
-                                                    t.update(userListDocument, { userCount: count })
+                                                    count = count + data.userCount
+                                                    t.update(userListDocumentRef, { userCount: count })
                                                 } else {
-                                                    const count = 1
-                                                    t.set(userListDocument, { userCount: count })
+                                                    t.set(userListDocumentRef, { userCount: count })
                                                 }
                                             })
                                     })
                                 )
                                 const referrerRef = userData.user_info.referrerRef
-                                let referralCommissionPrice = 0
+                                let referralCommissionPrice = 0;
                                 if (referrerRef)
                                     innerPromise.push(
                                         firestoreDb.collection(`${referrerRef}/referred_ones`)
@@ -112,30 +114,29 @@ export class Auth {
                                                 return firestoreDb.doc(`${Transactions.getRefMoneyAccount(firestoreDb.doc(referrerRef).id)}`).get()
                                                     .then(async referrerMoneyAccountDataSnapshot => {
 
-                                                        let referredOnes = 1;
+                                                        let activeReferredOnes = 1;
+                                                        let referredOnesCount = 1;
                                                         if (referrerMoneyAccountDataSnapshot.exists) {
-                                                            referredOnes = +referrerMoneyAccountDataSnapshot.get('referred_ones_count')
-                                                            referredOnes++
-                                                        }
-
-                                                        if (referrerMoneyAccountDataSnapshot.exists) {
+                                                            activeReferredOnes = +referrerMoneyAccountDataSnapshot.get('active_referred_ones_count')
+                                                            referredOnesCount = +referrerMoneyAccountDataSnapshot.get('referred_ones_count')
+                                                            referredOnesCount++
                                                             await new Promise((resolve, reject) => {
                                                                 admin.database().ref('/params/referral_commission_rate')
-                                                                    .orderByChild('max_quantity').startAt(referredOnes)
+                                                                    .orderByChild('max_quantity').startAt(activeReferredOnes)
                                                                     .limitToFirst(1).once('value', querySnapshot => {
                                                                         querySnapshot.forEach(referralSnapshot => {
                                                                             const data = referralSnapshot.val()
                                                                             console.log({ data })
                                                                             referralCommissionPrice = data.price
-                                                                            resolve()
                                                                             return true
                                                                         })
+                                                                        resolve()
                                                                     })
                                                             })
                                                         }
 
 
-                                                        return referrerMoneyAccountDataSnapshot.ref.set({ referred_ones_count: referredOnes }, { merge: true })
+                                                        return referrerMoneyAccountDataSnapshot.ref.set({ referred_ones_count: referredOnesCount }, { merge: true })
                                                     })
                                             }
                                             )
@@ -150,9 +151,11 @@ export class Auth {
                                             withdrawTotal: 0,
                                             depositCount: 0,
                                             referred_ones_count: 0,
+                                            active_referred_ones_count: 0,
+                                            is_active: false,
                                             referralCommissionCount: 0,
                                             referralCommissionPrice,
-                                            referrerRef: referrerRef ? referrerRef : 'EZYKARGO',
+                                            referrerRef: referrerRef ? referrerRef : Constants.EZYKARGO_REFERRER,
                                         })
                                         .then(() => {
                                             return firestoreDb.doc(Transactions.moneyAccount).get()

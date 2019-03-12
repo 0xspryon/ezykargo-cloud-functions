@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { Referrals } from './Referrals';
+import { Constants } from '../utils/Constants';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 const rp = require('request-promise');
 
@@ -10,7 +11,7 @@ const rp = require('request-promise');
 */
 export class Finances {
     static FORBIDDEN = 403;
-    static EZYKARGO_REFERRER = 'EZYKARGO';
+    // static EZYKARGO_REFERRER = 'EZYKARGO';
     static CONFLICT = 409;
     static UNPROCESSABLE_ENTITY = 422;
     static ezyowner = 'ezyowner';
@@ -397,9 +398,12 @@ export class Finances {
     static onTransactionCode = functions.database.ref('/intents/pay/{today_midnight}/{ref}/api_generated_details')
         .onUpdate((change, context) => {
 
-            // Exit when the data is deleted or updated at this location.
-            //very important for when we delete the data at the parent intent level.
-            //function will just start and exit but only after a previous execution will it just simply exit after starting.
+            /**
+             * Exit when the data is deleted or updated at this location.
+             * very important for when we delete the data at the parent intent level.
+             * functimport { Constants } from '../utils/Constants';
+             * function will just start and exit but only after a previous execution will it just simply exit after starting.
+            */
             if (change.before.val().transaction_provider_code) {
                 console.log('second execution of function and should exit by now')
                 return null;
@@ -582,15 +586,34 @@ export class Finances {
                     const {
                         balance,
                         escrowTotal,
+                        is_active,
+                        referralCommissionCount: ezyBizReferralCommissionCount,
                         referrerRef: ezyBizReferrerRefString,
                     } = ezyBizMoneyAccountSnapshot.data()
 
                     const newBalance = balance - amount_in_escrow;
                     const newEscrowTotal = escrowTotal - amount_in_escrow;
 
+                    /**
+                     * Update the update the active_refferer_count of the referrer
+                     */
+                    if (!is_active) {
+                        await firestore.doc(ezyBizReferrerRefString).get()
+                            .then(async referrerMoneyAccountSnapshot => {
+                                if (referrerMoneyAccountSnapshot.exists) {
+                                    const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
+                                    return referrerMoneyAccountSnapshot.ref.set({
+                                        active_referred_ones_count: 1 + active_referred_ones_count,
+                                        // is_active: true,
+                                    }, { merge: true })
+                                }
+                                return false
+                            })
+                    }
+
                     //send commission of ezybiz referrer
                     const promises = []
-                    if (ezyBizReferrerRefString !== Finances.EZYKARGO_REFERRER) {
+                    if (ezyBizReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyBizReferralCommissionCount < Constants.MAX_REFERRAL_CImMISSIONS) {
                         promises.push(
                             Referrals.cutReferralCommission(
                                 `/bucket/usersList/users/${ezyBizMoneyAccountSnapshot.ref.id}`
@@ -605,8 +628,28 @@ export class Finances {
                             driverRef.get()
                                 .then(driverSnasphot => {
                                     const subPromises = []
-                                    const { referrerRef: driverRefererRefString, truck } = driverSnasphot.data();
-                                    if (driverRefererRefString !== Finances.EZYKARGO_REFERRER) {
+                                    const {
+                                        referrerRef: driverRefererRefString,
+                                        truck,
+                                        is_active: isDriverActive,
+                                        referralCommissionCount: driverReferralComissionCount,
+                                    } = driverSnasphot.data();
+                                    /**
+                                     * Update the active_refferer_count of the referrer
+                                     */
+                                    if (!isDriverActive) {
+                                        firestore.doc(driverRefererRefString).get()
+                                            .then(async referrerMoneyAccountSnapshot => {
+                                                if (referrerMoneyAccountSnapshot.exists) {
+                                                    const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
+                                                    return referrerMoneyAccountSnapshot.ref.set({
+                                                        active_referred_ones_count: 1 + active_referred_ones_count,
+                                                    }, { merge: true })
+                                                }
+                                                return false
+                                            })
+                                    }
+                                    if (driverRefererRefString !== Constants.EZYKARGO_REFERRER && driverReferralComissionCount < Constants.MAX_REFERRAL_CImMISSIONS) {
                                         subPromises.push(
                                             Referrals.cutReferralCommission(`/bucket/usersList/users/${driverSnasphot.ref.id}`)
                                         )
@@ -620,7 +663,7 @@ export class Finances {
                                                     const { balance: driverMoneyAccountBalance } = driverMoneyAccountSnapshot.data()
                                                     t.update(
                                                         driverMoneyAccountRef,
-                                                        { balance: driverMoneyAccountBalance + driverPriceToBePaidShare }
+                                                        { balance: driverMoneyAccountBalance + driverPriceToBePaidShare, is_active: true, }
                                                     )
                                                 })
                                         })
@@ -638,16 +681,41 @@ export class Finances {
                                         firestore.runTransaction(t => {
                                             return t.get(ownerMoneyAccountRef)
                                                 .then(async ownerMoneyAccountSnapshot => {
-                                                    const { balance: ownerMoneyAccountBalance, referrerRef: ezyownerReferrerRefString } = ownerMoneyAccountSnapshot.data()
+                                                    const {
+                                                        balance: ownerMoneyAccountBalance,
+                                                        referrerRef: ezyownerReferrerRefString,
+                                                        is_active: isOwnerActive,
+                                                        referralCommissionCount: ezyownerReferralCommissionCount,
+                                                    } = ownerMoneyAccountSnapshot.data()
+
+                                                    /**
+                                                    * Update the active_refferer_count of the referrer
+                                                    */
+                                                    if (!isOwnerActive) {
+                                                        firestore.doc(ezyownerReferrerRefString).get()
+                                                            .then(async referrerMoneyAccountSnapshot => {
+                                                                if (referrerMoneyAccountSnapshot.exists) {
+                                                                    const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
+                                                                    return referrerMoneyAccountSnapshot.ref.set({
+                                                                        active_referred_ones_count: 1 + active_referred_ones_count,
+                                                                    }, { merge: true })
+                                                                }
+                                                                return true
+                                                            })
+                                                    }
+
                                                     t.update(
                                                         ownerMoneyAccountSnapshot.ref,
-                                                        { balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare }
+                                                        {
+                                                            is_active: true,
+                                                            balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare,
+                                                        }
                                                     )
-                                                    return Promise.resolve(ezyownerReferrerRefString)
+                                                    return Promise.resolve({ ezyownerReferrerRefString, ezyownerReferralCommissionCount })
                                                 })
                                         })
-                                            .then(ezyownerReferrerRefString => {
-                                                if (driverRefererRefString !== Finances.EZYKARGO_REFERRER) {
+                                            .then(({ ezyownerReferrerRefString, ezyownerReferralCommissionCount }) => {
+                                                if (ezyownerReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyownerReferralCommissionCount < Constants.MAX_REFERRAL_CIMMISSIONS_EZYOWNER) {
                                                     return Referrals.cutReferralCommission(ezyownerReferrerRefString)
                                                 }
                                                 return Promise.resolve('ok')
@@ -666,9 +734,13 @@ export class Finances {
 
 
 
-                    //deduce account of ezybiz.
+                    /**
+                     * Update the is_active state of ezybiz ac all of his transactions
+                     * deduce account of ezybiz. 
+                     */
                     ezyBizMoneyAccountSnapshot.ref.set(
                         {
+                            is_active: true,
                             balance: newBalance,
                             escrowTotal: newEscrowTotal,
                         },
@@ -680,7 +752,9 @@ export class Finances {
                     promises.push(
                         Finances.addEzyKargoPlatformTransaction(ezyKargoPlatformEzybizCommission, `firestoreRef : ${freightageSnapshot.ref}`)
                     )
-                    return Promise.all(promises)
+                    Promise.all(promises)
+                        .then(() => resolve())
+                        .catch(err => reject(err))
                 })
             }
             else return Promise.reject("The escrow in question doesn't exist. Seems like he overpressed a button")
