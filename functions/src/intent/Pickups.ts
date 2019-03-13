@@ -75,15 +75,16 @@ export class PickupsIntent {
                     if (!remote_item.carrying_quantity)
                       remote_item.carrying_quantity = 0;
                     if (
-                      item.quantity >
-                      remote_item.quantity - remote_item.carrying_quantity
+                      item.carrying_quantity >
+                      remote_item.carrying_quantity -
+                        remote_item.carrying_quantity
                     ) {
                       quantity_mismatch = true;
                     }
-                    remote_item.carrying_quantity += item.quantity;
+                    remote_item.carrying_quantity += item.carrying_quantity;
                     carrying_items.push({
                       ...remote_item,
-                      carrying_quantity: item.quantity,
+                      carrying_quantity: item.carrying_quantity,
                       index: item.index
                     });
                   });
