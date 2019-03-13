@@ -365,11 +365,20 @@ export class FreightagesIntent {
                 if (data["driverRef"].indexOf(driver.driverRef) !== -1) {
                   driver.completed = true;
                   driver.delivery = false;
+                  driver.delivery = false;
+                  driver.delivered = false;
                   driverSelected = driver;
                 }
                 if (driver.pickup) supData.pickup = true;
-                if (!driver.delivery) supData.onTransit = true;
-                if (!driver.completed) supData.delivered = true;
+                if (!driver.delivery){
+                  supData.pickup = true;
+                  supData.onTransit = true;
+                }
+                if (!driver.completed){
+                  supData.pickup = true;
+                  supData.onTransit = true;
+                  supData.delivered = true;
+                }
                 return driver;
               });
 
@@ -386,8 +395,8 @@ export class FreightagesIntent {
                   { merge: true }
                 )
                 .then(() => {
+                  const promises = [];
                   if (!supData.delivered) {
-                    const promises = [];
                     if (!supData.delivered) {
                       realtimeDatabase
                         .ref(
@@ -401,6 +410,7 @@ export class FreightagesIntent {
                           }/escrow/${freightageDataSnapshot.id}`
                         );
                     }
+                  }
                     // freightageData.drivers.forEach((driver)=>{
                     promises.push(
                       firestore
@@ -446,6 +456,7 @@ export class FreightagesIntent {
                                 .ref.set(userReview);
                             })
                             .catch(onrejected => {
+                              console.log("REVIEW", onrejected)
                               return realtimeDatabase
                                 .ref(
                                   `/intents/${timestamp}/mark_as_completed/${ref}/response`
@@ -471,13 +482,13 @@ export class FreightagesIntent {
                           )
                           .ref.set({ code: 500 });
                       });
-                  } else {
-                    return realtimeDatabase
-                      .ref(
-                        `/intents/${timestamp}/mark_as_completed/${ref}/response/code`
-                      )
-                      .ref.set(200);
-                  }
+                  // } else {
+                  //   return realtimeDatabase
+                  //     .ref(
+                  //       `/intents/${timestamp}/mark_as_completed/${ref}/response/code`
+                  //     )
+                  //     .ref.set(200);
+                  // }
                 })
                 .catch(onrejected => {
                   console.log("Reject", onrejected);

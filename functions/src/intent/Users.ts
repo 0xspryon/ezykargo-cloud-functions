@@ -28,7 +28,7 @@ export class UsersIntent {
                                 .then(freightageDataSnapshot => {
                                     const freightageData = freightageDataSnapshot.data()
                                     console.log(freightageData)
-                                    if (data["userRef"].indexOf(freightageData["driverRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["userRef"])) {
+                                    if (freightageData["driversRefString"].indexOf(data["userRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["userRef"])) {
                                         //is review for biz
                                         const average = ( +data.transparency+data.friendliness+data.promptness+data.correctness)/4;
                                         return reviewForDataSnapshot.ref
@@ -65,7 +65,7 @@ export class UsersIntent {
                                                 });
                                             })
                                     }
-                                    else if(data["userRef"].indexOf(freightageData["userRef"]) !== -1 && Users.getRef(data["reviewFor"]).indexOf(freightageData["driverRef"])){
+                                    else if(data["userRef"].indexOf(freightageData["userRef"]) !== -1 && freightageData["driversRefString"].indexOf(Users.getRef(data["reviewFor"]))){
                                         //is review for driver
                                         const ratings = [
                                             +data.transparency,
@@ -108,7 +108,7 @@ export class UsersIntent {
                                                 });
                                             })
                                     }else{
-                                        console.log("Unauthorized")
+                                        console.log("Unauthorized", data)
                                         return realtimeDatabase.ref(`/intents/add_review/${timestamp}/${ref}/response/code`).ref
                                             .set(401)
                                     }
