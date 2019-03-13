@@ -76,7 +76,7 @@ export class PickupsIntent {
                       remote_item.carrying_quantity = 0;
                     if (
                       item.carrying_quantity >
-                      remote_item.carrying_quantity -
+                      remote_item.quantity -
                         remote_item.carrying_quantity
                     ) {
                       quantity_mismatch = true;
