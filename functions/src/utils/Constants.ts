@@ -3,4 +3,8 @@ export class Constants {
     static CHANNEL_TOPIC = 'TOPIC'
     static CHANNEL_GROUP = 'GROUP'
     static TYPE_DEPOSIT = 'PAYMENT'
+    static EZYKARGO_REFERRER = 'EZYKARGO'
+    static MAX_REFERRAL_CImMISSIONS = 100
+    static MAX_REFERRAL_CIMMISSIONS_EZYOWNER = 50
+
 }
