@@ -257,8 +257,13 @@ export class FreightagesIntent {
                   driver.onTransit = false;
                   driver.delivery = true;
                 }
-                if (driver.pickup) supData.pickup = true;
-                if (!driver.delivery) supData.onTransit = true;
+                if (
+                  driver.pickup &&
+                  !(driver.onTransit || driver.delivery || driver.completed)
+                )
+                  supData.pickup = true;
+                if (driver.onTransit) supData.onTransit = true;
+                // if (!driver.delivery) supData.onTransit = true;
                 return driver;
               });
 
@@ -365,20 +370,16 @@ export class FreightagesIntent {
                 if (data["driverRef"].indexOf(driver.driverRef) !== -1) {
                   driver.completed = true;
                   driver.delivery = false;
-                  driver.delivery = false;
-                  driver.delivered = false;
+                  driver.onTransit = false;
                   driverSelected = driver;
                 }
-                if (driver.pickup) supData.pickup = true;
-                if (!driver.delivery){
+                if (
+                  driver.pickup &&
+                  !(driver.onTransit || driver.delivery || driver.completed)
+                )
                   supData.pickup = true;
-                  supData.onTransit = true;
-                }
-                if (!driver.completed){
-                  supData.pickup = true;
-                  supData.onTransit = true;
-                  supData.delivered = true;
-                }
+                if (driver.onTransit) supData.onTransit = true;
+                if (driver.delivery) supData.delivered = true;
                 return driver;
               });
 
@@ -411,77 +412,75 @@ export class FreightagesIntent {
                         );
                     }
                   }
-                    // freightageData.drivers.forEach((driver)=>{
-                    promises.push(
-                      firestore
-                        .doc(driverSelected.driverRef)
-                        .get()
-                        .then(driverDataSnapshot => {
-                          const driverData = driverDataSnapshot.data();
-                          console.log(driverData);
-                          const userReview = {
-                            avatarUrl: userData.avatarUrl,
-                            fullName: userData.fullName,
-                            average_rating: userData.average_rating,
-                            departure_date: freightageData.departure_date,
-                            amount: freightageData.amount,
-                            from: freightageData.from,
-                            to: freightageData.to,
-                            title: freightageData.title,
-                            freightageRef: data["freightageRef"],
-                            userId: userDataSnapshot.id
-                          };
-                          const driverReview = {
-                            avatarUrl: driverData.avatarUrl,
-                            fullName: driverData.fullName,
-                            average_rating: driverData.average_rating,
-                            departure_date: freightageData.departure_date,
-                            amount: freightageData.amount,
-                            from: freightageData.from,
-                            to: freightageData.to,
-                            title: freightageData.title,
-                            freightageRef: data["freightageRef"],
-                            userId: driverDataSnapshot.id
-                          };
-                          realtimeDatabase
-                            .ref(`/reviews/${userDataSnapshot.id}/${timestamp}`)
-                            .ref.set(driverReview)
-                            .then(() => {
-                              return realtimeDatabase
-                                .ref(
-                                  `/reviews/${
-                                    driverDataSnapshot.id
-                                  }/${timestamp}`
-                                )
-                                .ref.set(userReview);
-                            })
-                            .catch(onrejected => {
-                              console.log("REVIEW", onrejected)
-                              return realtimeDatabase
-                                .ref(
-                                  `/intents/${timestamp}/mark_as_completed/${ref}/response`
-                                )
-                                .ref.set({ code: 404 });
-                            });
-                        })
-                    );
-                    // })
-                    return Promise.all(promises)
-                      .then(() => {
-                        return realtimeDatabase
-                          .ref(
-                            `/intents/${timestamp}/mark_as_completed/${ref}/response/code`
-                          )
-                          .ref.set(200);
+                  // freightageData.drivers.forEach((driver)=>{
+                  promises.push(
+                    firestore
+                      .doc(driverSelected.driverRef)
+                      .get()
+                      .then(driverDataSnapshot => {
+                        const driverData = driverDataSnapshot.data();
+                        console.log(driverData);
+                        const userReview = {
+                          avatarUrl: userData.avatarUrl,
+                          fullName: userData.fullName,
+                          average_rating: userData.average_rating,
+                          departure_date: freightageData.departure_date,
+                          amount: freightageData.amount,
+                          from: freightageData.from,
+                          to: freightageData.to,
+                          title: freightageData.title,
+                          freightageRef: data["freightageRef"],
+                          userId: userDataSnapshot.id
+                        };
+                        const driverReview = {
+                          avatarUrl: driverData.avatarUrl,
+                          fullName: driverData.fullName,
+                          average_rating: driverData.average_rating,
+                          departure_date: freightageData.departure_date,
+                          amount: freightageData.amount,
+                          from: freightageData.from,
+                          to: freightageData.to,
+                          title: freightageData.title,
+                          freightageRef: data["freightageRef"],
+                          userId: driverDataSnapshot.id
+                        };
+                        realtimeDatabase
+                          .ref(`/reviews/${userDataSnapshot.id}/${timestamp}`)
+                          .ref.set(driverReview)
+                          .then(() => {
+                            return realtimeDatabase
+                              .ref(
+                                `/reviews/${driverDataSnapshot.id}/${timestamp}`
+                              )
+                              .ref.set(userReview);
+                          })
+                          .catch(onrejected => {
+                            console.log("REVIEW", onrejected);
+                            return realtimeDatabase
+                              .ref(
+                                `/intents/${timestamp}/mark_as_completed/${ref}/response`
+                              )
+                              .ref.set({ code: 404 });
+                          });
                       })
-                      .catch(onrejected => {
-                        console.log("Error on reject hire", onrejected);
-                        return realtimeDatabase
-                          .ref(
-                            `/intents/${timestamp}/mark_as_completed/${ref}/response`
-                          )
-                          .ref.set({ code: 500 });
-                      });
+                  );
+                  // })
+                  return Promise.all(promises)
+                    .then(() => {
+                      return realtimeDatabase
+                        .ref(
+                          `/intents/${timestamp}/mark_as_completed/${ref}/response/code`
+                        )
+                        .ref.set(200);
+                    })
+                    .catch(onrejected => {
+                      console.log("Error on reject hire", onrejected);
+                      return realtimeDatabase
+                        .ref(
+                          `/intents/${timestamp}/mark_as_completed/${ref}/response`
+                        )
+                        .ref.set({ code: 500 });
+                    });
                   // } else {
                   //   return realtimeDatabase
                   //     .ref(
