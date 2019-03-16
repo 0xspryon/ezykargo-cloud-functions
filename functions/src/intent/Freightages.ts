@@ -311,7 +311,7 @@ export class FreightagesIntent {
     });
 
   static listenMarkAsCompleted = functions.database
-    .ref("/intents//{timestamp}/mark_as_completed/{ref}")
+    .ref("/intents/{timestamp}/mark_as_completed/{ref}")
     .onCreate(async (snapshot, context) => {
       const firestore = admin.firestore();
       const realtimeDatabase = admin.database();
@@ -383,7 +383,7 @@ export class FreightagesIntent {
                 return driver;
               });
 
-              if (!supData.delivered)
+              if (!supData.delivered && !supData.onTransit && !supData.pickup)
                 supData.completedAt = FieldValue.serverTimestamp();
 
               return freightageDataSnapshot.ref
@@ -397,20 +397,22 @@ export class FreightagesIntent {
                 )
                 .then(() => {
                   const promises = [];
-                  if (!supData.delivered) {
-                    if (!supData.delivered) {
-                      realtimeDatabase
-                        .ref(
-                          `/intents/freightage_complete/${timestamp}/${
-                            userDataSnapshot.id
-                          }`
-                        )
-                        .ref.set(
-                          `/bucket/moneyAccount/moneyAccounts/${
-                            userDataSnapshot.id
-                          }/escrow/${freightageDataSnapshot.id}`
-                        );
-                    }
+                  if (
+                    !supData.delivered &&
+                    !supData.onTransit &&
+                    !supData.pickup
+                  ) {
+                    realtimeDatabase
+                      .ref(
+                        `/intents/freightage_complete/${timestamp}/${
+                          userDataSnapshot.id
+                        }`
+                      )
+                      .ref.set(
+                        `/bucket/moneyAccount/moneyAccounts/${
+                          userDataSnapshot.id
+                        }/escrow/${freightageDataSnapshot.id}`
+                      );
                   }
                   // freightageData.drivers.forEach((driver)=>{
                   promises.push(
