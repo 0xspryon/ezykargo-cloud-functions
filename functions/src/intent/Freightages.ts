@@ -405,7 +405,7 @@ export class FreightagesIntent {
                     realtimeDatabase
                       .ref(
                         `/intents/freightage_complete/${timestamp}/${
-                          userDataSnapshot.id
+                          freightageDataSnapshot.id
                         }`
                       )
                       .ref.set(
