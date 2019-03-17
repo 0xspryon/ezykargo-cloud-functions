@@ -562,7 +562,7 @@ export class Finances {
         /* once the data gotten, delete the escrow in question to avoid concurrent executions
         *  of this function on the same escrow which can bring in race conditions 
         */
-        escrowSnapshot.ref.delete()
+        // escrowSnapshot.ref.delete()
         const freightageSnapshot = await firestore.doc(referenceString).get()
         const { amount: frieghtageRequestPrice, drivers } = freightageSnapshot.data()
 
@@ -595,7 +595,7 @@ export class Finances {
           const newEscrowTotal = escrowTotal - amount_in_escrow;
 
           /**
-           * Update the update the active_refferer_count of the referrer
+           * Update the active_refferer_count of the referrer
            */
           if (!is_active) {
             await firestore.doc(ezyBizReferrerRefString).get()
