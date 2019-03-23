@@ -25,6 +25,6 @@ export class File {
       resumable: false
     });
     fs.unlinkSync(tempFilePath);
-    await file.delete();
+    return file.delete();
   };
 }

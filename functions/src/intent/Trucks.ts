@@ -820,10 +820,10 @@ export class TrucksIntent {
                 db.ref(`/intents/add_truck/${timestamp}/${ref}`)
                   .ref.child("response")
                   .set({ code: 201 })
-                  .then(() => {
+                  // .then(() => {
                     outerPromiseResolve();
-                    return true;
-                  });
+                  //   return true;
+                  // });
               })
               .catch(errAtFinalPromise => {
                 console.log({ errAtFinalPromise });
