@@ -673,13 +673,13 @@ export class TrucksIntent {
               hasValidTechnicalVisit: true,
               number_of_seats: +truckData.number_of_seats,
               number_of_tyres: +truckData.number_of_tyres,
-              registration_certificate: {
-                rc_number: truckData.rc_number,
-                rc_ssdt_id: truckData.rc_ssdt_id,
-                start_date: +truckData.start_date,
-                end_date: end_date.getTime(),
-                image: ""
-              },
+              // registration_certificate: {
+              //   rc_number: truckData.rc_number,
+              //   rc_ssdt_id: truckData.rc_ssdt_id,
+              //   start_date: +truckData.start_date,
+              //   end_date: end_date.getTime(),
+              //   image: ""
+              // },
               start_work: +truckData.start_work,
               userRef: truckData.userRef,
               volume: +truckData.volume,
@@ -696,12 +696,12 @@ export class TrucksIntent {
             console.log("saving images now");
 
             // move registration certificate image
-            const ivRcString = truckData.ivRcString;
-            const newIvRcString = `/trucks/${uid}/rc/${ivRcString
-              .split("/")
-              .pop()}`;
-            truckDoc.registration_certificate.image = newIvRcString;
-            promises.push(File.moveFileFromTo(ivRcString, newIvRcString));
+            // const ivRcString = truckData.ivRcString;
+            // const newIvRcString = `/trucks/${uid}/rc/${ivRcString
+            //   .split("/")
+            //   .pop()}`;
+            // truckDoc.registration_certificate.image = newIvRcString;
+            // promises.push(File.moveFileFromTo(ivRcString, newIvRcString));
             //moves truck images
             const imageCar1 = truckData.imageCar1;
             const newImageCar1 = `/trucks/${uid}/${imageCar1.split("/").pop()}`;
@@ -763,48 +763,48 @@ export class TrucksIntent {
                         });
                       })
                     );
-                    if (truckData.driver_ref !== "N/A") {
-                      subPromises.push(
-                        truckRefTesting.collection("drivers").add({
-                          driver_ref: truckData.driver_ref,
-                          driver_name: truckData.driverFullName,
-                          amount: 0,
-                          idle: false,
-                          createdAt: FieldValue.serverTimestamp()
-                        })
-                      );
+                    // if (truckData.driver_ref !== "N/A") {
+                    //   subPromises.push(
+                    //     truckRefTesting.collection("drivers").add({
+                    //       driver_ref: truckData.driver_ref,
+                    //       driver_name: truckData.driverFullName,
+                    //       amount: 0,
+                    //       idle: false,
+                    //       createdAt: FieldValue.serverTimestamp()
+                    //     })
+                    //   );
 
-                      subPromises.push(
-                        firestore.doc(truckData.driver_ref).set(
-                          {
-                            truck: {
-                              images: [
-                                newImageCar1,
-                                newImageCar2,
-                                newImageCar3,
-                                newImageCar4,
-                                newImageCar5,
-                                newImageCar6
-                              ],
-                              carrying_capacity: +truckData.carrying_capacity,
-                              category: truckData.category,
-                              common_name: truckData.common_name,
-                              immatriculation: truckData.immatriculation,
-                              make_by: truckData.make_by,
-                              model: truckData.model,
-                              number_of_seats: +truckData.number_of_seats,
-                              number_of_tyres: +truckData.number_of_tyres,
-                              start_work: +truckData.start_work,
-                              volume: +truckData.volume,
-                              weight: +truckData.weight,
-                              createdAt: FieldValue.serverTimestamp()
-                            }
-                          },
-                          { merge: true }
-                        )
-                      );
-                    }
-                    return Promise.all(subPromises)
+                    //   subPromises.push(
+                    //     firestore.doc(truckData.driver_ref).set(
+                    //       {
+                    //         truck: {
+                    //           images: [
+                    //             newImageCar1,
+                    //             newImageCar2,
+                    //             newImageCar3,
+                    //             newImageCar4,
+                    //             newImageCar5,
+                    //             newImageCar6
+                    //           ],
+                    //           carrying_capacity: +truckData.carrying_capacity,
+                    //           category: truckData.category,
+                    //           common_name: truckData.common_name,
+                    //           immatriculation: truckData.immatriculation,
+                    //           make_by: truckData.make_by,
+                    //           model: truckData.model,
+                    //           number_of_seats: +truckData.number_of_seats,
+                    //           number_of_tyres: +truckData.number_of_tyres,
+                    //           start_work: +truckData.start_work,
+                    //           volume: +truckData.volume,
+                    //           weight: +truckData.weight,
+                    //           createdAt: FieldValue.serverTimestamp()
+                    //         }
+                    //       },
+                    //       { merge: true }
+                    //     )
+                    //   );
+                    // }
+                    return Promise.all(subPromises);
                   })
                   .catch(errAtTruckRefSettingTesting => {
                     console.log({ errAtTruckRefSettingTesting });
@@ -818,13 +818,12 @@ export class TrucksIntent {
             Promise.all(promises)
               .then(succ => {
                 db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-                .ref.child("response")
-                .set({ code: 201 })
-                .then(() => {
-                  outerPromiseResolve();
-                  return true;
-                });
-                
+                  .ref.child("response")
+                  .set({ code: 201 })
+                  .then(() => {
+                    outerPromiseResolve();
+                    return true;
+                  });
               })
               .catch(errAtFinalPromise => {
                 console.log({ errAtFinalPromise });
