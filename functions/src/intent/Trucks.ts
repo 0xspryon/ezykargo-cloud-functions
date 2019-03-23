@@ -804,24 +804,7 @@ export class TrucksIntent {
                         )
                       );
                     }
-                    Promise.all(subPromises)
-                      .then(() => {
-                        db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-                          .ref.child("response")
-                          .set({ code: 201 })
-                          .then(() => {
-                            resolve(true);
-                            return true;
-                          });
-                      })
-                      .catch(err => {
-                        console.log({ err });
-                        db.ref(`/intents/add_truck/${timestamp}/${ref}`)
-                          .ref.child("response")
-                          .set({ code: 500 });
-                        reject(err);
-                        return false;
-                      });
+                    return Promise.all(subPromises)
                   })
                   .catch(errAtTruckRefSettingTesting => {
                     console.log({ errAtTruckRefSettingTesting });
@@ -834,10 +817,20 @@ export class TrucksIntent {
             );
             Promise.all(promises)
               .then(succ => {
-                outerPromiseResolve();
+                db.ref(`/intents/add_truck/${timestamp}/${ref}`)
+                .ref.child("response")
+                .set({ code: 201 })
+                .then(() => {
+                  outerPromiseResolve();
+                  return true;
+                });
+                
               })
               .catch(errAtFinalPromise => {
                 console.log({ errAtFinalPromise });
+                db.ref(`/intents/add_truck/${timestamp}/${ref}`)
+                  .ref.child("response")
+                  .set({ code: 500 });
                 outerPromiseReject();
               });
           }
