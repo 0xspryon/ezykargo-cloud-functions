@@ -477,7 +477,7 @@ export class TrucksIntent {
                           firestore
                             .collection(
                               dissociateDriverDataSnapshot.driverRef +
-                                "/notifications"
+                              "/notifications"
                             )
                             .add({
                               action:
@@ -582,7 +582,7 @@ export class TrucksIntent {
                           firestore
                             .collection(
                               dissociateDriverDataSnapshot.driverRef +
-                                "/notifications"
+                              "/notifications"
                             )
                             .orderBy("createdAt", "asc")
                             .where(
@@ -804,7 +804,8 @@ export class TrucksIntent {
                     //     )
                     //   );
                     // }
-                    return Promise.all(subPromises);
+                    return Promise.all(subPromises)
+                      .then(() => resolve())
                   })
                   .catch(errAtTruckRefSettingTesting => {
                     console.log({ errAtTruckRefSettingTesting });
@@ -820,10 +821,10 @@ export class TrucksIntent {
                 db.ref(`/intents/add_truck/${timestamp}/${ref}`)
                   .ref.child("response")
                   .set({ code: 201 })
-                  // .then(() => {
-                    outerPromiseResolve();
-                  //   return true;
-                  // });
+                // .then(() => {
+                outerPromiseResolve();
+                //   return true;
+                // });
               })
               .catch(errAtFinalPromise => {
                 console.log({ errAtFinalPromise });
@@ -878,7 +879,7 @@ export class TrucksIntent {
       image_path = image_path.split("?")[0];
       const IMAGE_MV_PATH = `/trucks/${ref}/${
         truckSnapShot.id
-      }/${image_path.split("/").pop()}`;
+        }/${image_path.split("/").pop()}`;
       promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH));
       // create tv doc
       const TechnicalVistDoc = {
@@ -986,7 +987,7 @@ export class TrucksIntent {
       image_path = image_path.split("?")[0];
       const IMAGE_MV_PATH = `/trucks/${ref}/${
         truckSnapShot.id
-      }/${image_path.split("/").pop()}`;
+        }/${image_path.split("/").pop()}`;
       promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH));
       // create tv doc
       const insurranceDoc = {
@@ -1098,7 +1099,7 @@ export class TrucksIntent {
       image_path = image_path.split("?")[0];
       const IMAGE_MV_PATH = `/trucks/${ref}/${
         truckSnapShot.id
-      }/${image_path.split("/").pop()}`;
+        }/${image_path.split("/").pop()}`;
       promises.push(File.moveFileFromTo(image_path, IMAGE_MV_PATH));
       // create tv doc
       const registrationCertificateDoc = {
