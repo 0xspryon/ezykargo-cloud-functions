@@ -2,6 +2,10 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { Freightages, Users } from "../models";
 
+const delay = (ms: number) => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
 export class PickupsIntent {
   /**
    * 1- get freightage
@@ -43,7 +47,7 @@ export class PickupsIntent {
             .runTransaction(t => {
               return t
                 .get(firestore.doc(Freightages.getRef(freightageRef)))
-                .then(freightageDataSnapshot => {
+                .then(async freightageDataSnapshot => {
                   const freightageData = freightageDataSnapshot.data();
                   /** Step 2 */
                   const driverFound = freightageData.drivers.find(
@@ -76,8 +80,7 @@ export class PickupsIntent {
                       remote_item.carrying_quantity = 0;
                     if (
                       item.carrying_quantity >
-                      remote_item.quantity -
-                        remote_item.carrying_quantity
+                      remote_item.quantity - remote_item.carrying_quantity
                     ) {
                       quantity_mismatch = true;
                     }
@@ -95,6 +98,7 @@ export class PickupsIntent {
                         `/intents/mark_as_pickup/${timestamp}/${freightageRef}/${userRef}/response`
                       )
                       .ref.set({ code: 404 });
+                  await delay(1300);
                   /** Step 4 */
                   return freightageDataSnapshot.ref
                     .set(
@@ -195,7 +199,7 @@ export class PickupsIntent {
             .runTransaction(t => {
               return t
                 .get(firestore.doc(Freightages.getRef(freightageRef)))
-                .then(freightageDataSnapshot => {
+                .then(async freightageDataSnapshot => {
                   const freightageData = freightageDataSnapshot.data();
                   /** Step 2 */
                   if (
@@ -251,6 +255,7 @@ export class PickupsIntent {
                         pickup = true;
                     });
                   }
+                  await delay(1300);
 
                   /** Step 7 */
                   t.update(firestore.doc(Freightages.getRef(freightageRef)), {
