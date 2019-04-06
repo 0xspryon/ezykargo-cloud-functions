@@ -12,7 +12,8 @@ import {
   TransactionsIntent,
   PickupsIntent,
   Finances,
-  Notifications
+  Notifications,
+  CronJob
 } from "./intent";
 
 //inititalize firebase admin
@@ -62,6 +63,9 @@ export const listenValidatePickup = PickupsIntent.listenValidatePickup;
 //users
 export const listenAddReview = UsersIntent.listenAddReview;
 
+//cron
+export const cronJob = CronJob.cronJob;
+
 //payment
 export const listenMakePayment = TransactionsIntent.listenMakePayment;
 export const listenMakeWithdrawal = TransactionsIntent.listenMakeWithdrawal;
@@ -73,7 +77,7 @@ export const onPayment = Finances.onPayment;
 export const onWithdraw = Finances.onWithdraw;
 export const onWithdrawWebhook = Finances.onWithdrawWebhook;
 export const onPaymentWebhook = Finances.onPaymentWebhook;
-export const onTransactionCode = Finances.onTransactionCode;
+// export const onTransactionCode = Finances.onTransactionCode;
 export const payMoneyInEscrow = Finances.payMoneyInEscrow;
 
 //Notifications

@@ -28,6 +28,7 @@ export class Finances {
       res.set('Access-Control-Max-Age', '3600');
       res.status(204).send('');
     }
+
     else {
       const rtdb = admin.database()
       const firestoreDb = admin.firestore()
@@ -395,73 +396,73 @@ export class Finances {
         });
     })
 
-  static onTransactionCode = functions.database.ref('/intents/pay/{today_midnight}/{ref}/api_generated_details')
-    .onUpdate((change, context) => {
+  // static onTransactionCode = functions.database.ref('/intents/pay/{today_midnight}/{ref}/api_generated_details')
+  //   .onUpdate((change, context) => {
 
-      /**
-       * Exit when the data is deleted or updated at this location.
-       * very important for when we delete the data at the parent intent level.
-       * functimport { Constants } from '../utils/Constants';
-       * function will just start and exit but only after a previous execution will it just simply exit after starting.
-      */
-      if (change.before.val().transaction_provider_code) {
-        console.log('second execution of function and should exit by now')
-        return null;
-      } else {
+  //     /**
+  //      * Exit when the data is deleted or updated at this location.
+  //      * very important for when we delete the data at the parent intent level.
+  //      * functimport { Constants } from '../utils/Constants';
+  //      * function will just start and exit but only after a previous execution will it just simply exit after starting.
+  //     */
+  //     if (change.before.val().transaction_provider_code) {
+  //       console.log('second execution of function and should exit by now')
+  //       return null;
+  //     } else {
 
-        // const providerName = data.transaction_provider_name.charAt(0).toUpperCase() + data.transaction_provider_name.substr(1)
-        const data = change.after.val()
-        console.log({ data })
-        const formData = {
-          merchant_public_key: functions.config().wecashup.merchant_public_key,
-          merchant_secret: functions.config().wecashup.merchant_secret_key,
-          transaction_token: data.transaction_token,
-          transaction_uid: data.transaction_uid,
-          transaction_confirmation_code: data.transaction_provider_code,
-          transaction_provider_name: data.transaction_provider_name,
-          _method: 'PATCH'
-        }
+  //       // const providerName = data.transaction_provider_name.charAt(0).toUpperCase() + data.transaction_provider_name.substr(1)
+  //       const data = change.after.val()
+  //       console.log({ data })
+  //       const formData = {
+  //         merchant_public_key: functions.config().wecashup.merchant_public_key,
+  //         merchant_secret: functions.config().wecashup.merchant_secret_key,
+  //         transaction_token: data.transaction_token,
+  //         transaction_uid: data.transaction_uid,
+  //         transaction_confirmation_code: data.transaction_provider_code,
+  //         transaction_provider_name: data.transaction_provider_name,
+  //         _method: 'PATCH'
+  //       }
 
-        /* Wecashup accepts request with content type set to url-encoded
-         * setting the property form below in the optionss of request promise
-         * automatically sets the request type to url-form-encoded
-         */
-        const options = {
-          method: 'POST',
-          uri: `https://www.wecashup.com/api/v2.0/merchants/${functions.config().wecashup.merchant_uid}/transactions/${data.transaction_uid}?merchant_secret=${functions.config().wecashup.merchant_secret_key}&merchant_public_key=${functions.config().wecashup.merchant_public_key}`,
-          form: { ...formData },
-        };
+  //       /* Wecashup accepts request with content type set to url-encoded
+  //        * setting the property form below in the optionss of request promise
+  //        * automatically sets the request type to url-form-encoded
+  //        */
+  //       const options = {
+  //         method: 'POST',
+  //         uri: `https://www.wecashup.com/api/v2.0/merchants/${functions.config().wecashup.merchant_uid}/transactions/${data.transaction_uid}?merchant_secret=${functions.config().wecashup.merchant_secret_key}&merchant_public_key=${functions.config().wecashup.merchant_public_key}`,
+  //         form: { ...formData },
+  //       };
 
-        return rp(options)
-          .then(function (body) {
-            const bodyData = JSON.parse(body)
-            change.after.ref.parent.remove();
-            if (parseInt(bodyData.response_code) === 201) {
-              return admin.database().ref(`temp/transactions/${data.transaction_uid}`).set({ ...bodyData.response_content, timestamp: FieldValue.serverTimestamp() })
-            }
-            return Promise.resolve();
-          })
-          .catch(err => {
-            console.log({ err })
-            const { amount, reference } = data
+  //       return rp(options)
+  //         .then(function (body) {
+  //           const bodyData = JSON.parse(body)
+  //           change.after.ref.parent.remove();
+  //           if (parseInt(bodyData.response_code) === 201) {
+  //             return admin.database().ref(`temp/transactions/${data.transaction_uid}`).set({ ...bodyData.response_content, timestamp: FieldValue.serverTimestamp() })
+  //           }
+  //           return Promise.resolve();
+  //         })
+  //         .catch(err => {
+  //           console.log({ err })
+  //           const { amount, reference } = data
 
-            return admin.database().ref('intents/notification/deposit')
-              .push({
-                // channel: Constants.CHANNEL_INDIVIDUAL,
-                currency: 'XAF',
-                userRefKey: reference,
-                amount,
-                // type: Constants.TYPE_PAYMENT,
-                statusSuccess: false,
-                operatorApplication: Finances.ezybiz
-              })
-              .then(ignored => {
-                change.after.ref.child('response')
-                  .set({ code: 500 })
-              })
-          });
-      }
-    })
+  //           return admin.database().ref('intents/notification/deposit')
+  //             .push({
+  //               // channel: Constants.CHANNEL_INDIVIDUAL,
+  //               currency: 'XAF',
+  //               userRefKey: reference,
+  //               amount,
+  //               // type: Constants.TYPE_PAYMENT,
+  //               statusSuccess: false,
+  //               operatorApplication: Finances.ezybiz
+  //             })
+  //             .then(ignored => {
+  //               change.after.ref.child('response')
+  //                 .set({ code: 500 })
+  //             })
+  //         });
+  //     }
+  //   })
 
   static putMoneyInEscrow = async (amountToBePutInEscrow, referenceString, userRefString) => {
     const firestore = admin.firestore()
@@ -562,7 +563,7 @@ export class Finances {
         /* once the data gotten, delete the escrow in question to avoid concurrent executions
         *  of this function on the same escrow which can bring in race conditions 
         */
-        // escrowSnapshot.ref.delete()
+        escrowSnapshot.ref.delete()
         const freightageSnapshot = await firestore.doc(referenceString).get()
         const { amount: frieghtageRequestPrice, drivers } = freightageSnapshot.data()
 
@@ -738,13 +739,15 @@ export class Finances {
            * Update the is_active state of ezybiz ac all of his transactions
            * deduce account of ezybiz. 
            */
-          ezyBizMoneyAccountSnapshot.ref.set(
-            {
-              is_active: true,
-              balance: newBalance,
-              escrowTotal: newEscrowTotal,
-            },
-            { merge: true }
+          promises.push(
+            ezyBizMoneyAccountSnapshot.ref.set(
+              {
+                is_active: true,
+                balance: newBalance,
+                escrowTotal: newEscrowTotal,
+              },
+              { merge: true }
+            )
           )
 
           //setting ezykargoPlatformEzybizReferralCommission
@@ -778,85 +781,77 @@ export class Finances {
     })
   }
 
-  static transactionCalculatorCron = functions.https.onRequest((req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-
-    if (req.method === 'OPTIONS') {
-      res.set('Access-Control-Allow-Methods', 'GET');
-      res.set('Access-Control-Allow-Headers', 'Content-Type');
-      res.set('Access-Control-Max-Age', '3600');
-      res.status(204).send('');
-    }
-    else {
+  public static cronFinance = () => {
+    return new Promise(async (resolve, reject) => {
       const rtdb = admin.database()
       const firestoreDb = admin.firestore()
       const promises = []
-      console.log({ requestBody: req.body })
 
       const accountRef = rtdb.ref('z-platform/statistics/finances')
-      accountRef.child('pending_transactions').once('value', pendingTransactionsListSnapshot => {
-        let TotalAmountToSave = 0;
-        const transactionsToBeLogged = []
-        let platformBalanceBefore;
-        let platformBalanceAfter;
+      // promises.push(
+      accountRef.child('pending_transactions')
+        .once('value', pendingTransactionsListSnapshot => {
+          let TotalAmountToSave = 0;
+          const transactionsToBeLogged = []
+          let platformBalanceBefore;
+          let platformBalanceAfter;
 
-        pendingTransactionsListSnapshot.forEach(transactionSnapshot => {
-          const { amount, shouldIncrement, reason } = transactionSnapshot.val()
-          let actualAmount = amount
-          if (!shouldIncrement) actualAmount = -amount
-          TotalAmountToSave += actualAmount
-          transactionsToBeLogged.push({
-            amount,
-            shouldIncrement,
-            reason,
+          pendingTransactionsListSnapshot.forEach(transactionSnapshot => {
+            const { amount, shouldIncrement, reason } = transactionSnapshot.val()
+            let actualAmount = amount
+            if (!shouldIncrement) actualAmount = -amount
+            TotalAmountToSave += actualAmount
+
+            transactionsToBeLogged.push({
+              amount,
+              shouldIncrement,
+              reason,
+            })
+
+            transactionSnapshot.ref.remove()
+            return true;
           })
-          transactionSnapshot.ref.remove()
-          return true;
-        })
-        promises.push(accountRef.transaction(financesAccount => {
-          if (financesAccount) {
-            const { ezykargo_balance } = financesAccount
-            platformBalanceBefore = ezykargo_balance
-            platformBalanceAfter = TotalAmountToSave + ezykargo_balance
-            return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
-          } else {
-            platformBalanceAfter = TotalAmountToSave
-            return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
-          }
-        }))
-        const docRef = firestoreDb.collection('bucket/finances/savedTransactions/').doc()
-        promises.push(
-          docRef.set({
+          
+          promises.push(accountRef.child('balance').transaction(financesAccount => {
+            if (financesAccount) {
+              const { ezykargo_balance } = financesAccount
+              platformBalanceBefore = ezykargo_balance
+              platformBalanceAfter = TotalAmountToSave + ezykargo_balance
+              return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
+            } else {
+              platformBalanceAfter = TotalAmountToSave
+              return { ...financesAccount, ezykargo_balance: platformBalanceAfter }
+            }
+          }))
+
+          const docRef = firestoreDb.collection('bucket/finances/savedTransactions/').doc()
+          promises.push(docRef.set({
             timeStamp: admin.firestore.FieldValue.serverTimestamp(),
             balanceBefore: platformBalanceBefore,
             balanceAfter: platformBalanceAfter,
             TotalAmountToSave,
             transactionsToBeLogged,
             path: docRef.path,
-          })
+          }))
 
-        )
-        Promise.all(promises)
-          .then(() => {
+          Promise.all(promises)
+            .then(() => resolve())
+            .catch(err => {
+              console.log({ err, path: docRef.path })
+              rtdb.ref('z-platform/statistics/errors')
+                .push({
+                  message: 'error at saving platform balance.',
+                  balanceBefore: platformBalanceBefore,
+                  balanceAfter: platformBalanceAfter,
+                  TotalAmountToSave,
+                  transactionsToBeLogged,
+                  path: docRef.path,
+                })
+                .then(ignored => reject())
+            })
+        })
+    })
+    return Promise.resolve()
+  }
 
-            return res.status(200).json({ status: 'ok' })
-          })
-          .catch(err => {
-            console.log({ err, path: docRef.path })
-            rtdb.ref('z-platform/statistics/errors')
-              .push({
-                message: 'error at saving platform balance.',
-                balanceBefore: platformBalanceBefore,
-                balanceAfter: platformBalanceAfter,
-                TotalAmountToSave,
-                transactionsToBeLogged,
-                path: docRef.path,
-              })
-              .then(ignored => {
-                return res.status(200).json({ status: 'ok' })
-              })
-          })
-      })
-    }
-  })
 }

@@ -7,5 +7,17 @@ import { TransactionsIntent } from "./Transactions";
 import { PickupsIntent } from "./Pickups"
 import { Finances } from './Finances'
 import { Notifications } from './Notifications';
+import { CronJob } from './CronJob';
 
-export { Auth, UsersIntent, Notifications, TrucksIntent, BargainsIntent, FreightagesIntent, TransactionsIntent, PickupsIntent, Finances }
+export {
+    Auth,
+    UsersIntent,
+    Notifications,
+    TrucksIntent,
+    BargainsIntent,
+    FreightagesIntent,
+    TransactionsIntent,
+    PickupsIntent,
+    Finances,
+    CronJob
+}
