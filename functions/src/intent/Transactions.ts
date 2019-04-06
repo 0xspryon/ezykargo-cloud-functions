@@ -211,6 +211,7 @@ export class TransactionsIntent {
               ...requestData,
               ...monetBilResult,
               timestamp: FieldValue.serverTimestamp(),
+              finished: true,
               type: "withdrawal"
             });
             return realtimeDatabase
@@ -309,6 +310,7 @@ export class TransactionsIntent {
               let newVal = {};
               if (data.status === "success") {
                 newVal = {
+                  finished: true,
                   prevAmount: +account["balance"],
                   newAmount: +account["balance"] + (+data.amount)
                 };

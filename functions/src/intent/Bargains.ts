@@ -8,6 +8,10 @@ const FieldValue = require("firebase-admin").firestore.FieldValue;
 const crypto = require("crypto");
 
 const PAYMENT_REQUIRED = 402;
+const delay = (ms: number) => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
 export class BargainsIntent {
   static listenAddBargainerOnRTDB = functions.database
     .ref("bargain/{freightageRef}/participants/{userRef}")
@@ -378,7 +382,7 @@ export class BargainsIntent {
               .runTransaction(t => {
                 return t
                   .get(firestore.doc(Users.getRef(userRef)))
-                  .then(userDataSnapshot => {
+                  .then(async userDataSnapshot => {
                     //check if someone already picked up
                     if (freightageData.pickup) {
                       return realtimeDatabase
@@ -511,6 +515,8 @@ export class BargainsIntent {
                         };
                       }
                       console.log(dataToUpdate);
+
+                      await delay(1300);
                       //update freightage and pass it to pickup and send notification to all user depend on status
                       return freightageDataSnapshot.ref
                         .set(dataToUpdate, { merge: true })
