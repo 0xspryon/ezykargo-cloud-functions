@@ -5,6 +5,84 @@ import { Freightages } from "../models";
 const FieldValue = require("firebase-admin").firestore.FieldValue;
 
 export class FreightagesIntent {
+  /**
+   * Delete freightage
+   */
+
+  static listenDeleteFreightage = functions.database
+    .ref("/intents/{timestamp}/delete_freightage/{ref}")
+    .onCreate(async (snapshot, context) => {
+      const firestore = admin.firestore();
+      const realtimeDatabase = admin.database();
+
+      const ref = context.params.ref;
+      const timestamp = context.params.timestamp;
+
+      const data = snapshot.val();
+
+      firestore
+        .doc(data["userRef"])
+        .get()
+        .then(userDataSnapshot => {
+          const userData = userDataSnapshot.data();
+          if (userData["transaction_pin_code"] !== "" + data["password"]) {
+            realtimeDatabase
+              .ref(
+                `/intents/${timestamp}/delete_freightage/${ref}/response/code`
+              )
+              .ref.set(403);
+            return;
+          }
+          firestore
+            .doc(data["freightageRef"])
+            .get()
+            .then(freightageDataSnapshot => {
+              const freightageData = freightageDataSnapshot.data();
+              if (data["userRef"].indexOf(freightageData.userRef) === -1) {
+                realtimeDatabase
+                  .ref(
+                    `/intents/${timestamp}/delete_freightage/${ref}/response/code`
+                  )
+                  .ref.set(404);
+                return;
+              }
+
+              firestore
+                .doc(data["freightageRef"])
+                .delete()
+                .then(() => {
+                  realtimeDatabase
+                    .ref(
+                      `/intents/${timestamp}/delete_freightage/${ref}/response/code`
+                    )
+                    .ref.set(200);
+                })
+                .catch(onrejected => {
+                  console.log("Error on reject delete freightage", onrejected);
+                  realtimeDatabase
+                    .ref(
+                      `/intents/${timestamp}/delete_freightage/${ref}/response/code`
+                    )
+                    .ref.set(500);
+                });
+            })
+            .catch(onrejected => {
+              console.log("Reject", onrejected);
+              realtimeDatabase
+                .ref(
+                  `/intents/${timestamp}/delete_freightage/${ref}/response/code`
+                )
+                .ref.set(404);
+            });
+        })
+        .catch(onrejected => {
+          console.log("Reject", onrejected);
+          realtimeDatabase
+            .ref(`/intents/${timestamp}/delete_freightage/${ref}/response/code`)
+            .ref.set(404);
+        });
+    });
+
   /***
    * @ creates a new freightage request on the platform.
    * -Doesn't verify validity of data in the freightage request as that will be done with security rules.
