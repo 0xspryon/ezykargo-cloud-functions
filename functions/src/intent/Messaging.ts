@@ -10,9 +10,15 @@ const EZYKARGO_SENDER_NAME = 'EZYKARGO'
 
 const messageTemplates = {
     freightPayment: {
-        en: (data) => `Payment for ${data.name} success. Balance: ${data.balance} XAF`,
-        fr: (data) => `Paiement de ${data.name} success. Solde: ${data.balance} XAF`,
-    }
+        en: (data) => `Payment for ${data.name} was successfull, amount paid ${data.amount}. Balance: ${data.balance} XAF. Best Regards EzyKargo`,
+        fr: (data) => `Paiement de ${data.name} était un succès, montant payé ${data.amount}. Solde: ${data.balance} XAF. Cordialement EzyKargo`,
+    },
+
+    freightPaymentOwner: {
+        en: (data) => `Payment for ${data.name} by ${data.driverName} was successfull, amount paid ${data.amount}. Balance: ${data.balance} XAF. Best Regards EzyKargo`,
+        fr: (data) => `Paiement de ${data.name} par ${data.driverName} était un succès, montant payé ${data.amount}. Solde: ${data.balance} XAF. Cordialement EzyKargo`,
+    },
+
 }
 
 
@@ -25,19 +31,20 @@ export class Messaging {
      */
     static listenNewMessage = functions.database.ref('/intents/message/{timestamp}/{ref}')
         .onCreate(async (snapshot, context) => {
-            const { to, type, data, local = 'en' } = snapshot.val()
-            const message = messageTemplates[type][local](data)
+            const { to, type, data } = snapshot.val()
+            // const message = messageTemplates[type][local](data)
+            const proms = [messageTemplates[type]['en'](data), messageTemplates[type]['fr'](data)].map(message => {
+                const options = {
+                    method: 'GET',
+                    uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=0`,
+                };
 
-            const options = {
-                method: 'GET',
-                uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=0`,
-            };
-
-            return rp(options)
-                .then(function (body) {
-                    console.log({ messageBody: body }); // Print the HTML for the Google homepage.
-                    return snapshot.ref.remove()
-                })
-
+                return rp(options)
+                    .then(function (body) {
+                        console.log({ messageBody: body }); // Print the HTML for the Google homepage.
+                        return snapshot.ref.remove()
+                    })
+            })
+            return Promise.all(proms)
         });
 }
