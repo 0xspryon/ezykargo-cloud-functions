@@ -13,7 +13,8 @@ import {
   PickupsIntent,
   Finances,
   Notifications,
-  CronJob
+  CronJob,
+  Messaging
 } from "./intent";
 
 //inititalize firebase admin
@@ -65,6 +66,9 @@ export const listenAddReview = UsersIntent.listenAddReview;
 
 //cron
 export const cronJob = CronJob.cronJob;
+
+//messaging
+export const listenNewMessage = Messaging.listenNewMessage;
 
 //payment
 export const listenMakePayment = TransactionsIntent.listenMakePayment;

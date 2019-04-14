@@ -232,6 +232,7 @@ export class TrucksIntent {
                     make_by: truckSnapshot.get("make_by"),
                     model: truckSnapshot.get("model"),
                     number_of_seats: +truckSnapshot.get("number_of_seats"),
+                    userRef: truckSnapshot.get("userRef"),
                     number_of_tyres: +truckSnapshot.get("number_of_tyres"),
                     start_work: +truckSnapshot.get("start_work"),
                     hasAValidInsurrance: truckSnapshot.get(
@@ -239,6 +240,9 @@ export class TrucksIntent {
                     ),
                     hasValidTechnicalVisit: truckSnapshot.get(
                       "hasValidTechnicalVisit"
+                    ),
+                    hasValidRegistrationCertificate: truckSnapshot.get(
+                      "hasValidRegistrationCertificate"
                     ),
                     volume: +truckSnapshot.get("volume"),
                     createdAt: FieldValue.serverTimestamp()

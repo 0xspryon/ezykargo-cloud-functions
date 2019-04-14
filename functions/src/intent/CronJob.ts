@@ -20,8 +20,8 @@ import { Finances } from '.'
 */
 export class CronJob {
     static cronJob = functions.https.onRequest((req, res) => {
-        const promises = []
-        promises.push(
+    const promises = []
+    promises.push(
             Finances.cronFinance()
         )
         Promise.all(promises)

@@ -8,6 +8,7 @@ import { PickupsIntent } from "./Pickups"
 import { Finances } from './Finances'
 import { Notifications } from './Notifications';
 import { CronJob } from './CronJob';
+import { Messaging } from './Messaging';
 
 export {
     Auth,
@@ -19,5 +20,6 @@ export {
     TransactionsIntent,
     PickupsIntent,
     Finances,
+    Messaging,
     CronJob
 }

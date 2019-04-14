@@ -2,6 +2,8 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { Referrals } from './Referrals';
 import { Constants } from '../utils/Constants';
+import { PhonenumberUtils } from '../utils/PhonenumberUtils';
+import { DocumentSnapshot } from 'firebase-functions/lib/providers/firestore';
 const FieldValue = require('firebase-admin').firestore.FieldValue;
 const rp = require('request-promise');
 
@@ -523,6 +525,7 @@ export class Finances {
 
   static removeMoneyFromEscrow = async (referenceString, userRefString) => {
     const firestore = admin.firestore()
+    const db = admin.database()
     const userRef = firestore.doc(userRefString)
     const productRef = firestore.doc(referenceString)
     const accountSnapshot = await firestore.doc(`/bucket/moneyAccount/moneyAccounts/${userRef.id}`).get()
@@ -553,93 +556,166 @@ export class Finances {
 
   static payMoneyInEscrow = functions.database.ref('/intents/freightage_complete/{timestamp}/{push_id}')
     .onCreate(async (snapshot, context) => {
-      // const { escrowRef: escrowRefString, freightageref } = snapshot.val()
       const escrowRefString = snapshot.val()
       const firestore = admin.firestore()
+      const database = admin.database()
       const escrowRef = firestore.doc(escrowRefString)
       const escrowSnapshot = await escrowRef.get()
-      if (escrowSnapshot.exists) {
-        const { amount_in_escrow, referenceString } = escrowSnapshot.data()
-        /* once the data gotten, delete the escrow in question to avoid concurrent executions
-        *  of this function on the same escrow which can bring in race conditions 
-        */
-        escrowSnapshot.ref.delete()
-        const freightageSnapshot = await firestore.doc(referenceString).get()
-        const { amount: frieghtageRequestPrice, drivers } = freightageSnapshot.data()
 
-        // let selectedDriverRefString;
-        const driverData = drivers.map(driverDatum => {
-          let totalWeight = 0;
-          driverDatum.items.forEach(item => {
-            const { carrying_quantity, weight } = item
-            totalWeight += (carrying_quantity * weight)
-          })
-          const priceToBePaid = (totalWeight * frieghtageRequestPrice) / Finances.TON_TO_KILO_DIVISOR
-          return ({
-            priceToBePaid,
-            driverRefString: driverDatum.driverRef,
-            // truckRef: driverData.truckRef,
-          })
+      if (!escrowSnapshot.exists) {
+        return Promise.reject("The escrow in question doesn't exist. Seems like he overpressed a button")
+      }
+
+      const { amount_in_escrow, referenceString } = escrowSnapshot.data()
+      /* once the data gotten, delete the escrow in question to avoid concurrent executions
+      *  of this function on the same escrow which can bring in race conditions 
+      */
+      // escrowSnapshot.ref.delete()
+
+      const freightageSnapshot = await firestore.doc(referenceString).get()
+      const { amount: frieghtageRequestPrice, drivers, title } = freightageSnapshot.data()
+
+      const driverData = drivers.map(driverDatum => {
+        const totalWeight = driverDatum.items.reduce(
+          (acc, curItem) => {
+            const { carrying_quantity, weight } = curItem
+            return acc + (carrying_quantity * weight)
+          },
+          0
+        )
+        const priceToBePaid = (totalWeight * frieghtageRequestPrice) / Finances.TON_TO_KILO_DIVISOR
+        return ({
+          priceToBePaid,
+          driverRefString: driverDatum.driverRef,
+          // truckRef: driverData.truckRef,
         })
+      })
 
-        return new Promise(async (resolve, reject) => {
-          const ezyBizMoneyAccountSnapshot = await escrowSnapshot.ref.parent.parent.get()
+      return new Promise(async (resolve, reject) => {
+        const ezyBizMoneyAccountSnapshot = await escrowSnapshot.ref.parent.parent.get()
+        const {
+          balance,
+          escrowTotal,
+          is_active,
+          referralCommissionCount: ezyBizReferralCommissionCount,
+          referrerRef: ezyBizReferrerRefString,
+        } = ezyBizMoneyAccountSnapshot.data()
+
+        const newBalance = balance - amount_in_escrow;
+        const newEscrowTotal = escrowTotal - amount_in_escrow;
+
+        /**
+         * Update the active_refferer_count of the referrer
+         */
+        if (!is_active && ezyBizReferrerRefString !== Constants.EZYKARGO_REFERRER) {
+          await firestore.doc(ezyBizReferrerRefString).get()
+            .then(async referrerMoneyAccountSnapshot => {
+              if (referrerMoneyAccountSnapshot.exists) {
+                const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
+                return referrerMoneyAccountSnapshot.ref.set({
+                  active_referred_ones_count: 1 + active_referred_ones_count,
+                  // is_active: true,
+                }, { merge: true })
+              }
+              return false
+            })
+        }
+
+        //send commission of ezybiz referrer
+        const promises = []
+        if (ezyBizReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyBizReferralCommissionCount < Constants.MAX_REFERRAL_COMMISSIONS) {
+          promises.push(
+            Referrals.cutReferralCommission(
+              `/bucket/usersList/users/${ezyBizMoneyAccountSnapshot.ref.id}`
+            )
+          )
+        }
+
+        //pay drivers, owners and their respective referrers
+        driverData.map(async driverDatum => {
+          const driverRef = firestore.doc(driverDatum.driverRefString)
+          const driverMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${driverRef.id}`)
+          const driverAndMoneysnapshot: DocumentSnapshot[] = await Promise.all([
+            driverRef.get(),
+            driverMoneyAccountRef.get()
+          ])
+
+          let driver_data: any = {}
+          driverAndMoneysnapshot.map(tempSnapshot => driver_data = { ...driver_data, ...tempSnapshot.data() })
+
+
+          // promises.push(
+          // driverRef.get()
+          //   .then(driverSnasphot => {
+          // const driver_data = driverSnasphot.data();
+          const subPromises = []
+          console.log({ driver_data })
           const {
-            balance,
-            escrowTotal,
-            is_active,
-            referralCommissionCount: ezyBizReferralCommissionCount,
-            referrerRef: ezyBizReferrerRefString,
-          } = ezyBizMoneyAccountSnapshot.data()
-
-          const newBalance = balance - amount_in_escrow;
-          const newEscrowTotal = escrowTotal - amount_in_escrow;
+            referrerRef: driverRefererRefString,
+            truck,
+            is_active: isDriverActive,
+            referralCommissionCount: driverReferralComissionCount,
+          } = driver_data
 
           /**
            * Update the active_refferer_count of the referrer
            */
-          if (!is_active) {
-            await firestore.doc(ezyBizReferrerRefString).get()
+          if (Boolean(driverRefererRefString) && driverRefererRefString !== Constants.EZYKARGO_REFERRER && !isDriverActive) {
+            firestore.doc(driverRefererRefString).get()
               .then(async referrerMoneyAccountSnapshot => {
                 if (referrerMoneyAccountSnapshot.exists) {
                   const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
                   return referrerMoneyAccountSnapshot.ref.set({
                     active_referred_ones_count: 1 + active_referred_ones_count,
-                    // is_active: true,
                   }, { merge: true })
                 }
                 return false
               })
           }
-
-          //send commission of ezybiz referrer
-          const promises = []
-          if (ezyBizReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyBizReferralCommissionCount < Constants.MAX_REFERRAL_CImMISSIONS) {
-            promises.push(
-              Referrals.cutReferralCommission(
-                `/bucket/usersList/users/${ezyBizMoneyAccountSnapshot.ref.id}`
-              )
+          if (driverRefererRefString !== Constants.EZYKARGO_REFERRER && driverReferralComissionCount < Constants.MAX_REFERRAL_COMMISSIONS) {
+            subPromises.push(
+              Referrals.cutReferralCommission(`/bucket/usersList/users/${driverRef.id}`)
             )
           }
+          // const driverMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${driverRef.id}`)
+          const driverPriceToBePaidShare = (driverData.priceToBePaid * truck.percentage) / 100
+          subPromises.push(
+            firestore.runTransaction(t => {
+              return t.get(driverMoneyAccountRef)
+                .then(driverMoneyAccountSnapshot => {
+                  const { balance: driverMoneyAccountBalance } = driverMoneyAccountSnapshot.data()
+                  t.update(
+                    driverMoneyAccountRef,
+                    { balance: driverMoneyAccountBalance + driverPriceToBePaidShare, is_active: true, }
+                  )
+                })
+            })
+          )
+          subPromises.push(driverMoneyAccountRef.collection('transactions').add({
+            type: 'payment',
+            amount: driverDatum.priceToBePaid,
+            timestamp: FieldValue.serverTimestamp(),
+          }))
 
-          //pay drivers, owners and their respective referrers
-          driverData.map(driverDatum => {
-            const driverRef = firestore.doc(driverDatum.driverRefString)
-            promises.push(
-              driverRef.get()
-                .then(driverSnasphot => {
-                  const subPromises = []
+          const ownerRef = firestore.doc(truck.userRef)
+          const ownerMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${ownerRef.id}`)
+          const ownerPriceToBePaidShare = (driverData.priceToBePaid * (100 - truck.percentage)) / 100
+          subPromises.push(
+            firestore.runTransaction(t => {
+              return t.get(ownerMoneyAccountRef)
+                .then(async ownerMoneyAccountSnapshot => {
                   const {
-                    referrerRef: driverRefererRefString,
-                    truck,
-                    is_active: isDriverActive,
-                    referralCommissionCount: driverReferralComissionCount,
-                  } = driverSnasphot.data();
+                    balance: ownerMoneyAccountBalance,
+                    referrerRef: ezyownerReferrerRefString,
+                    is_active: isOwnerActive,
+                    referralCommissionCount: ezyownerReferralCommissionCount,
+                  } = ownerMoneyAccountSnapshot.data()
+
                   /**
-                   * Update the active_refferer_count of the referrer
-                   */
-                  if (!isDriverActive) {
-                    firestore.doc(driverRefererRefString).get()
+                  * Update the active_refferer_count of the referrer
+                  */
+                  if (!isOwnerActive && driverRefererRefString !== Constants.EZYKARGO_REFERRER ) {
+                    firestore.doc(ezyownerReferrerRefString).get()
                       .then(async referrerMoneyAccountSnapshot => {
                         if (referrerMoneyAccountSnapshot.exists) {
                           const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
@@ -647,120 +723,91 @@ export class Finances {
                             active_referred_ones_count: 1 + active_referred_ones_count,
                           }, { merge: true })
                         }
-                        return false
+                        return true
                       })
                   }
-                  if (driverRefererRefString !== Constants.EZYKARGO_REFERRER && driverReferralComissionCount < Constants.MAX_REFERRAL_CImMISSIONS) {
-                    subPromises.push(
-                      Referrals.cutReferralCommission(`/bucket/usersList/users/${driverSnasphot.ref.id}`)
-                    )
-                  }
-                  const driverMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${driverSnasphot.ref.id}`)
-                  const driverPriceToBePaidShare = (driverData.priceToBePaid * truck.percentage) / 100
-                  subPromises.push(
-                    firestore.runTransaction(t => {
-                      return t.get(driverMoneyAccountRef)
-                        .then(driverMoneyAccountSnapshot => {
-                          const { balance: driverMoneyAccountBalance } = driverMoneyAccountSnapshot.data()
-                          t.update(
-                            driverMoneyAccountRef,
-                            { balance: driverMoneyAccountBalance + driverPriceToBePaidShare, is_active: true, }
-                          )
-                        })
-                    })
+
+                  t.update(
+                    ownerMoneyAccountSnapshot.ref,
+                    {
+                      is_active: true,
+                      balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare,
+                    }
                   )
-                  subPromises.push(driverMoneyAccountRef.collection('transactions').add({
-                    type: 'payment',
-                    amount: driverDatum.priceToBePaid,
-                    timestamp: FieldValue.serverTimestamp(),
-                  }))
+                  return Promise.resolve({ ezyownerReferrerRefString, ezyownerReferralCommissionCount })
+                })
+            })
+              .then(({ ezyownerReferrerRefString, ezyownerReferralCommissionCount }) => {
+                if (ezyownerReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyownerReferralCommissionCount < Constants.MAX_REFERRAL_COMMISSIONS_EZYOWNER) {
+                  return Referrals.cutReferralCommission(ezyownerReferrerRefString)
+                }
+                return Promise.resolve('ok')
+              })
+              .catch(err => console.log({ err }))
+          )
 
-                  const ownerRef = firestore.doc(truck.ownerRef)
-                  const ownerMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${ownerRef.id}`)
-                  const ownerPriceToBePaidShare = (driverData.priceToBePaid * (100 - truck.percentage)) / 100
-                  subPromises.push(
-                    firestore.runTransaction(t => {
-                      return t.get(ownerMoneyAccountRef)
-                        .then(async ownerMoneyAccountSnapshot => {
-                          const {
-                            balance: ownerMoneyAccountBalance,
-                            referrerRef: ezyownerReferrerRefString,
-                            is_active: isOwnerActive,
-                            referralCommissionCount: ezyownerReferralCommissionCount,
-                          } = ownerMoneyAccountSnapshot.data()
+          subPromises.push(ownerMoneyAccountRef.collection('transactions').add({
+            type: 'payment',
+            amount: ownerPriceToBePaidShare,
+            timestamp: FieldValue.serverTimestamp(),
+          }))
+          return Promise.all(subPromises)
+            .then(ignored => escrowRef.delete())
+          // })
+          // )
+        })
 
-                          /**
-                          * Update the active_refferer_count of the referrer
-                          */
-                          if (!isOwnerActive) {
-                            firestore.doc(ezyownerReferrerRefString).get()
-                              .then(async referrerMoneyAccountSnapshot => {
-                                if (referrerMoneyAccountSnapshot.exists) {
-                                  const { active_referred_ones_count } = referrerMoneyAccountSnapshot.data()
-                                  return referrerMoneyAccountSnapshot.ref.set({
-                                    active_referred_ones_count: 1 + active_referred_ones_count,
-                                  }, { merge: true })
-                                }
-                                return true
-                              })
-                          }
 
-                          t.update(
-                            ownerMoneyAccountSnapshot.ref,
-                            {
-                              is_active: true,
-                              balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare,
-                            }
-                          )
-                          return Promise.resolve({ ezyownerReferrerRefString, ezyownerReferralCommissionCount })
-                        })
-                    })
-                      .then(({ ezyownerReferrerRefString, ezyownerReferralCommissionCount }) => {
-                        if (ezyownerReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyownerReferralCommissionCount < Constants.MAX_REFERRAL_CIMMISSIONS_EZYOWNER) {
-                          return Referrals.cutReferralCommission(ezyownerReferrerRefString)
-                        }
-                        return Promise.resolve('ok')
-                      })
-                      .catch(err => console.log({ err }))
-                  )
 
-                  subPromises.push(ownerMoneyAccountRef.collection('transactions').add({
-                    type: 'payment',
-                    amount: ownerPriceToBePaidShare,
-                    timestamp: FieldValue.serverTimestamp(),
-                  }))
-                  return Promise.all(subPromises)
-                }))
+        /**
+         * Update the is_active state of ezybiz, balance and escrowTotal ac all of his transactions
+         * deduce account of ezybiz.
+         * No need to verify state of being active before updating.
+         */
+        promises.push(
+          ezyBizMoneyAccountSnapshot.ref.set(
+            {
+              is_active: true,
+              balance: newBalance,
+              escrowTotal: newEscrowTotal,
+            },
+            { merge: true }
+          )
+        )
+
+        /**
+         * Send message to ezybiz to notify him of the payment.
+         */
+        firestore.doc(`bucket/usersList/users/${ezyBizMoneyAccountSnapshot.id}`).get()
+          .then(ezybizSnapshot => {
+            const { phonenumber: ezybizPhonenumber } = ezybizSnapshot.data()
+            const ezyBizMessagePaymentIntent = {
+              type: Constants.MESSAGE_TYPE_FRIEGHT_PAYMENT,
+              to: PhonenumberUtils.parsePhonenumberForMessaging(ezybizPhonenumber),
+              data: {
+                name: title,
+                balance: newBalance,
+              }
+            }
+            console.log({ ezyBizMessagePaymentIntent })
+            database.ref(`/intents/message/${context.params.timestamp}`)
+              .push(ezyBizMessagePaymentIntent)
+          })
+          .catch(err => {
+            //do nothing
           })
 
-
-
-          /**
-           * Update the is_active state of ezybiz ac all of his transactions
-           * deduce account of ezybiz. 
-           */
-          promises.push(
-            ezyBizMoneyAccountSnapshot.ref.set(
-              {
-                is_active: true,
-                balance: newBalance,
-                escrowTotal: newEscrowTotal,
-              },
-              { merge: true }
-            )
-          )
-
-          //setting ezykargoPlatformEzybizReferralCommission
-          const ezyKargoPlatformEzybizCommission = amount_in_escrow - frieghtageRequestPrice
-          promises.push(
-            Finances.addEzyKargoPlatformTransaction(ezyKargoPlatformEzybizCommission, `firestoreRef : ${freightageSnapshot.ref}`)
-          )
-          Promise.all(promises)
-            .then(() => resolve())
-            .catch(err => reject(err))
-        })
-      }
-      else return Promise.reject("The escrow in question doesn't exist. Seems like he overpressed a button")
+        //setting ezykargoPlatformEzybizReferralCommission
+        const ezyKargoPlatformEzybizCommission = amount_in_escrow - frieghtageRequestPrice
+        promises.push(
+          Finances.addEzyKargoPlatformTransaction(ezyKargoPlatformEzybizCommission, `firestoreRef : ${freightageSnapshot.ref.path}`)
+        )
+        Promise.all(promises)
+          .then(() => resolve())
+          .catch(err => reject(err))
+      })
+      // }
+      // else 
     })
 
   /*
@@ -788,7 +835,6 @@ export class Finances {
       const promises = []
 
       const accountRef = rtdb.ref('z-platform/statistics/finances')
-      // promises.push(
       accountRef.child('pending_transactions')
         .once('value', pendingTransactionsListSnapshot => {
           let TotalAmountToSave = 0;
@@ -811,7 +857,7 @@ export class Finances {
             transactionSnapshot.ref.remove()
             return true;
           })
-          
+
           promises.push(accountRef.child('balance').transaction(financesAccount => {
             if (financesAccount) {
               const { ezykargo_balance } = financesAccount
