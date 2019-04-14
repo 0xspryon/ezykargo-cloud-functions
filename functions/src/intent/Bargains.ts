@@ -525,7 +525,7 @@ export class BargainsIntent {
                             .ref(
                               `/intents/${timestamp}/accepted_hired_request/${freightageRef}/${userRef}/response`
                             )
-                            .ref.set({ code: 201 });
+                            .ref.set({ code: 200 });
                         });
                     }
                   });

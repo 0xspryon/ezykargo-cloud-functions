@@ -48,6 +48,7 @@ export const listenAddRegistrationCertificateIntent =
 //freightage management
 export const listenAddFreightageIntent =
   FreightagesIntent.listenAddFreightageIntent;
+export const listenDeleteFreightage = FreightagesIntent.listenDeleteFreightage;
 export const listenMarkAsDeliveredNew = FreightagesIntent.listenMarkAsDelivered;
 export const listenMarkAsCompletedNew = FreightagesIntent.listenMarkAsCompleted;
 
