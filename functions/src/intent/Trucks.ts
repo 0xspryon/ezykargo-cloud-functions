@@ -171,13 +171,14 @@ export class TrucksIntent {
             );
             // if(newIntentDataSnapshot.driverRef!== "N/A"){
             //add driver inside drivers list
-            const { fullname, avatarUrl } = driverSnapshot.data()
+            const { fullName, avatarUrl } = driverSnapshot.data()
+            console.log({ driverdata: driverSnapshot.data() })
             promises.push(
               truckSnapshot.ref.collection("drivers").add({
                 driver_ref: newIntentDataSnapshot.driverRef,
                 idle: false,
                 percentage: consentData.percentage,
-                fullname,
+                name: fullName,
                 avatar: avatarUrl,
                 createdAt: FieldValue.serverTimestamp()
               })
