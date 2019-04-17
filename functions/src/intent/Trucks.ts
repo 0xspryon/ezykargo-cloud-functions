@@ -102,6 +102,11 @@ export class TrucksIntent {
             return false;
           }
 
+          const driverSnapshot = await admin
+            .firestore()
+            .doc(newIntentDataSnapshot.driverRef)
+            .get();
+
           //verify trucker has no truck before associating
           if (newIntentDataSnapshot.driverRef != "N/A") {
             await new Promise((resolve, reject) => {
@@ -129,10 +134,6 @@ export class TrucksIntent {
               return false;
             }
 
-            const driverSnapshot = await admin
-              .firestore()
-              .doc(newIntentDataSnapshot.driverRef)
-              .get();
             if (driverSnapshot.exists) {
               const driverData = driverSnapshot.data();
 
@@ -158,23 +159,27 @@ export class TrucksIntent {
                 .limit(1)
                 .get()
                 .then(driverQuerySnapshot => {
-                  driverQuerySnapshot.forEach(driverSnapshot => {
-                    // console.log(driverSnapshot.data())
+                  driverQuerySnapshot.forEach(driverInngerSnapshot => {
+                    // console.log(driverInngerSnapshot.data())
                     promises.push(
-                      driverSnapshot.ref.set({ idle: true }, { merge: true })
+                      driverInngerSnapshot.ref.set({ idle: true }, { merge: true })
                     );
                     //remove truck from drivernewIntentDataSnapshot.truckRef
-                    // promises.push(firestore.doc(driverSnapshot.data().driver_ref).set({ truck: null }, { merge: true }))
+                    // promises.push(firestore.doc(driverInngerSnapshot.data().driver_ref).set({ truck: null }, { merge: true }))
                   });
                 })
             );
             // if(newIntentDataSnapshot.driverRef!== "N/A"){
             //add driver inside drivers list
+            const { fullName, avatarUrl } = driverSnapshot.data()
+            console.log({ driverdata: driverSnapshot.data() })
             promises.push(
               truckSnapshot.ref.collection("drivers").add({
                 driver_ref: newIntentDataSnapshot.driverRef,
-                amount: 0,
                 idle: false,
+                percentage: consentData.percentage,
+                name: fullName,
+                avatar: avatarUrl,
                 createdAt: FieldValue.serverTimestamp()
               })
             );

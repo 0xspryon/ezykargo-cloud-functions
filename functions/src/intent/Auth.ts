@@ -145,7 +145,7 @@ export class Auth {
                                 innerPromise.push(
                                     firestoreDb.doc(Transactions.getRefMoneyAccount(userRef.id))
                                         .set({
-                                            balance: 0,
+                                            balance: 900000,
                                             escrowTotal: 0,
                                             withdrawCount: 0,
                                             withdrawTotal: 0,
