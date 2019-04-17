@@ -8,6 +8,7 @@ const FieldValue = require("firebase-admin").firestore.FieldValue;
 const crypto = require("crypto");
 
 const PAYMENT_REQUIRED = 402;
+const PLATFORME_FEES = 1.12;
 const delay = (ms: number) => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
@@ -502,6 +503,7 @@ export class BargainsIntent {
                           idle: false,
                           inBargain: false,
                           amount: selectedBargain.price,
+                          bizAmount: selectedBargain.price * PLATFORME_FEES,
                           bargains,
                           drivers: selectedDrivers,
                           driversRefString: selectedDrivers.map(driver => {

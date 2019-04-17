@@ -98,7 +98,7 @@ export class PickupsIntent {
                         `/intents/mark_as_pickup/${timestamp}/${freightageRef}/${userRef}/response`
                       )
                       .ref.set({ code: 404 });
-                  await delay(1300);
+                  await delay(1100);
                   /** Step 4 */
                   return freightageDataSnapshot.ref
                     .set(
