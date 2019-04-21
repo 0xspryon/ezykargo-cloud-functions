@@ -36,7 +36,7 @@ export class Messaging {
             const proms = [messageTemplates[type]['en'](data), messageTemplates[type]['fr'](data)].map(message => {
                 const options = {
                     method: 'GET',
-                    uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=0`,
+                    uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=1`,
                 };
 
                 return rp(options)

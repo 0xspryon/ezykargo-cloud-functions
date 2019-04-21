@@ -573,8 +573,11 @@ export class Finances {
       // escrowSnapshot.ref.delete()
 
       const freightageSnapshot = await firestore.doc(referenceString).get()
-      const { amount: frieghtageRequestPrice, drivers, title } = freightageSnapshot.data()
+      const { amount: frieghtageRequestPrice, bizAmount, drivers, title, weight: weight_in_kg } = freightageSnapshot.data()
+      const bizTotalAmountToPay = bizAmount * weight_in_kg / Finances.TON_TO_KILO_DIVISOR
 
+      let ezykargoAmount = bizTotalAmountToPay
+      const trucker_owner_amount = frieghtageRequestPrice - (frieghtageRequestPrice * 12 / 100)
       const driverData = drivers.map(driverDatum => {
         const totalWeight = driverDatum.items.reduce(
           (acc, curItem) => {
@@ -583,13 +586,16 @@ export class Finances {
           },
           0
         )
-        const priceToBePaid = (totalWeight * frieghtageRequestPrice) / Finances.TON_TO_KILO_DIVISOR
+
+        const priceToBePaid = (totalWeight * trucker_owner_amount) / Finances.TON_TO_KILO_DIVISOR
+        ezykargoAmount = ezykargoAmount - priceToBePaid
         return ({
           priceToBePaid,
           driverRefString: driverDatum.driverRef,
           // truckRef: driverData.truckRef,
         })
       })
+
       console.log({ driverData })
 
       return new Promise(async (resolve, reject) => {
@@ -602,8 +608,8 @@ export class Finances {
           referrerRef: ezyBizReferrerRefString,
         } = ezyBizMoneyAccountSnapshot.data()
 
-        const newBalance = balance - amount_in_escrow;
-        const newEscrowTotal = escrowTotal - amount_in_escrow;
+        const newBalance = balance - bizTotalAmountToPay;
+        const newEscrowTotal = escrowTotal - bizTotalAmountToPay;
 
         /**
          * Update the active_refferer_count of the referrer of this ezybiz
@@ -685,13 +691,19 @@ export class Finances {
                     driverMoneyAccountRef,
                     { balance: driverNewBalance, is_active: true, }
                   )
-                  return driverNewBalance
+                  return {
+                    driverNewBalance,
+                    amountPaid: driverPriceToBePaidShare,
+                    previousBalance: driverMoneyAccountBalance
+                  }
                 })
             })
-              .then((driverBalance) => {
+              .then(({ driverNewBalance, amountPaid, previousBalance }) => {
                 const prom1 = driverMoneyAccountRef.collection('transactions').add({
                   type: 'payment',
-                  amount: driverDatum.priceToBePaid,
+                  amount: amountPaid,
+                  newBalance: driverNewBalance,
+                  previousBalance,
                   timestamp: FieldValue.serverTimestamp(),
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${driverMoneyAccountRef.id}`).get()
@@ -703,8 +715,8 @@ export class Finances {
                       to: PhonenumberUtils.parsePhonenumberForMessaging(driverPhonenumber),
                       data: {
                         name: title,
-                        amount: driverDatum.priceToBePaid,
-                        balance: driverBalance,
+                        amount: amountPaid,
+                        balance: driverNewBalance,
                       }
                     }
                     console.log({ ezyBizMessagePaymentIntent: driverMessagePaymentIntent })
@@ -712,13 +724,13 @@ export class Finances {
                       .push(driverMessagePaymentIntent)
                   })
                 return Promise.all([prom1, prom2])
-                  // .then(ignored => true)
+                // .then(ignored => true)
               })
           )
 
           const ownerRef = firestore.doc(truck.userRef)
           const ownerMoneyAccountRef = firestore.doc(`/bucket/moneyAccount/moneyAccounts/${ownerRef.id}`)
-          const ownerPriceToBePaidShare = (driverDatum.priceToBePaid * (100 - truck.percentage)) / 100
+          const ownerPriceToBePaidShare = driverDatum.priceToBePaid * ((100 - truck.percentage) / 100)
           subPromises.push(
             firestore.runTransaction(t => {
               return t.get(ownerMoneyAccountRef)
@@ -753,20 +765,23 @@ export class Finances {
                       balance: ownerMoneyAccountBalance + ownerPriceToBePaidShare,
                     }
                   )
-                  return Promise.resolve({
+                  return {
                     ezyownerReferrerRefString,
                     newBalance: ownerMoneyAccountBalance + ownerPriceToBePaidShare,
+                    amount: ownerPriceToBePaidShare,
+                    previousBalance: ownerMoneyAccountBalance,
                     ezyownerReferralCommissionCount,
-                  })
+                  }
                 })
             })
-              .then(({ ezyownerReferrerRefString, ezyownerReferralCommissionCount, newBalance: ownerNewBalance }) => {
+              .then(({ previousBalance, ezyownerReferrerRefString, ezyownerReferralCommissionCount, newBalance: ownerNewBalance, amount }) => {
                 if (ezyownerReferrerRefString !== Constants.EZYKARGO_REFERRER && ezyownerReferralCommissionCount < Constants.MAX_REFERRAL_COMMISSIONS_EZYOWNER) {
                   return Referrals.cutReferralCommission(ezyownerReferrerRefString)
                 }
                 const prom1 = ownerMoneyAccountRef.collection('transactions').add({
                   type: 'payment',
                   amount: ownerPriceToBePaidShare,
+                  previousBalance,
                   timestamp: FieldValue.serverTimestamp(),
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${ownerRef.id}`).get()
@@ -788,7 +803,7 @@ export class Finances {
                   })
 
                 return Promise.all([prom1, prom2])
-                  // .then(ignored => true)
+                // .then(ignored => true)
               })
           )
 
@@ -814,6 +829,16 @@ export class Finances {
           )
         )
 
+        //add transaction on ezybiz
+        promises.push(
+          ezyBizMoneyAccountSnapshot.ref.collection('transactions').add({
+            type: 'payment_out',
+            amount: bizTotalAmountToPay,
+            previousBalance: balance,
+            timestamp: FieldValue.serverTimestamp(),
+          })
+        )
+
         /**
          * Send message to ezybiz to notify him of the payment.
          */
@@ -828,8 +853,7 @@ export class Finances {
                 balance: newBalance,
               }
             }
-            console.log({ ezyBizMessagePaymentIntent })
-            database.ref(`/intents/message/${context.params.timestamp}`)
+            return database.ref(`/intents/message/${context.params.timestamp}`)
               .push(ezyBizMessagePaymentIntent)
           })
           .catch(err => {
@@ -837,7 +861,7 @@ export class Finances {
           })
 
         //setting ezykargoPlatformEzybizReferralCommission
-        const ezyKargoPlatformEzybizCommission = amount_in_escrow - frieghtageRequestPrice
+        const ezyKargoPlatformEzybizCommission = ezykargoAmount
         promises.push(
           Finances.addEzyKargoPlatformTransaction(ezyKargoPlatformEzybizCommission, `firestoreRef : ${freightageSnapshot.ref.path}`)
         )
