@@ -706,7 +706,7 @@ export class Finances {
                   finished: true,
                   prevAmount: previousBalance,
                   timestamp: FieldValue.serverTimestamp(),
-                  channel_name: 'internal',
+                  channel: 'internal',
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${driverMoneyAccountRef.id}`).get()
                   .then(async driverSnapshot => {
@@ -806,7 +806,7 @@ export class Finances {
                   prevAmount: previousBalance,
                   newAmount: ownerNewBalance,
                   finished: true,
-                  channel_name: 'internal',
+                  channel: 'internal',
                   timestamp: FieldValue.serverTimestamp(),
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${ownerRef.id}`).get()
@@ -862,7 +862,7 @@ export class Finances {
             prevAmount: balance,
             finished: true,
             timestamp: FieldValue.serverTimestamp(),
-            channel_name: 'internal',
+            channel: 'internal',
             newAmount: newBalance,
           })
         )
