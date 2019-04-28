@@ -10,13 +10,18 @@ const EZYKARGO_SENDER_NAME = 'EZYKARGO'
 
 const messageTemplates = {
     freightPayment: {
-        en: (data) => `Payment for ${data.name} was successfull, amount paid ${data.amount}. Balance: ${data.balance} XAF. Best Regards EzyKargo`,
-        fr: (data) => `Paiement de ${data.name} était un succès, montant payé ${data.amount}. Solde: ${data.balance} XAF. Cordialement EzyKargo`,
+        en: (data) => `Account credited of ${data.amount}FCFA for ${data.name}, balance: ${data.balance}FCFA. Best Regards EzyKargo`,
+        fr: (data) => `Compte crédité de ${data.amount}FCFA pour ${data.name}, solde: ${data.balance}FCFA. Cordialement EzyKargo`,
+    },
+
+    freightPaymentOut: {
+        en: (data) => `Account debited of ${data.amount}FCFA for ${data.name}, balance: ${data.balance}FCFA. Best Regards EzyKargo`,
+        fr: (data) => `Compte débité: ${data.amount}FCFA pour ${data.name}, solde: ${data.balance}FCFA. Cordialement EzyKargo`,
     },
 
     freightPaymentOwner: {
-        en: (data) => `Payment for ${data.name} by ${data.driverName} was successfull, amount paid ${data.amount}. Balance: ${data.balance} XAF. Best Regards EzyKargo`,
-        fr: (data) => `Paiement de ${data.name} par ${data.driverName} était un succès, montant payé ${data.amount}. Solde: ${data.balance} XAF. Cordialement EzyKargo`,
+        en: (data) => `Account credited of ${data.amount}FCFA by ${data.driverName}, balance: ${data.balance}FCFA. Best Regards EzyKargo`,
+        fr: (data) => `Compte crédité de ${data.amount}FCFA par ${data.driverName}, solde: ${data.balance}FCFA. Cordialement EzyKargo`,
     },
 
 }
@@ -36,7 +41,7 @@ export class Messaging {
             const proms = [messageTemplates[type]['en'](data), messageTemplates[type]['fr'](data)].map(message => {
                 const options = {
                     method: 'GET',
-                    uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=1`,
+                    uri: `https://www.easysendsms.com/sms/bulksms-api/bulksms-api?username=${easySendUser}&password=${easySendPassword}&from=${EZYKARGO_SENDER_NAME}&to=${to}&text=${message}&type=2`,
                 };
 
                 return rp(options)

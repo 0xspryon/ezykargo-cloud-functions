@@ -8,6 +8,7 @@ export class Constants {
     static MAX_REFERRAL_COMMISSIONS_EZYOWNER = 50
 
     static MESSAGE_TYPE_FRIEGHT_PAYMENT = 'freightPayment'
+    static MESSAGE_TYPE_FRIEGHT_PAYMENT_OUT = 'freightPaymentOut'
     static MESSAGE_TYPE_FRIEGHT_PAYMENT_TO_OWNER = 'freightPaymentOwner'
 
 }

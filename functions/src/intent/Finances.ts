@@ -700,28 +700,50 @@ export class Finances {
             })
               .then(({ driverNewBalance, amountPaid, previousBalance }) => {
                 const prom1 = driverMoneyAccountRef.collection('transactions').add({
-                  type: 'payment',
+                  type: 'pay_in',
                   amount: amountPaid,
-                  newBalance: driverNewBalance,
-                  previousBalance,
+                  newAmount: driverNewBalance,
+                  finished: true,
+                  prevAmount: previousBalance,
                   timestamp: FieldValue.serverTimestamp(),
+                  channel_name: 'internal',
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${driverMoneyAccountRef.id}`).get()
-                  .then(driverSnapshot => {
-                    const { phonenumber: driverPhonenumber, fullName: driverFullName } = driverSnapshot.data()
-                    driverName = driverFullName;
+                  .then(async driverSnapshot => {
+                    const { phonenumber: truckerPhonenumber, fullName: truckerFullName, truck:truckerTruck, avatarUrl } = driverSnapshot.data()
+                    driverName = truckerFullName;
+
+                    /**
+                     * Add trucker transaction into the transaction collection of the truck
+                     */
+                    await firestore.collection(`${truckerTruck.truckRef}/transactions`)
+                      .add({
+                        type: 'pay_in',
+                        amount: amountPaid,
+                        timestamp: FieldValue.serverTimestamp(),
+                        truckerRef: driverSnapshot.ref,
+                        truckerName: truckerFullName,
+                        finished: true,
+                        avatarUrl, 
+                      })
+
                     const driverMessagePaymentIntent = {
                       type: Constants.MESSAGE_TYPE_FRIEGHT_PAYMENT,
-                      to: PhonenumberUtils.parsePhonenumberForMessaging(driverPhonenumber),
+                      to: PhonenumberUtils.parsePhonenumberForMessaging(truckerPhonenumber),
                       data: {
                         name: title,
                         amount: amountPaid,
                         balance: driverNewBalance,
                       }
                     }
+
                     console.log({ ezyBizMessagePaymentIntent: driverMessagePaymentIntent })
                     return database.ref(`/intents/message/${context.params.timestamp}`)
                       .push(driverMessagePaymentIntent)
+
+
+
+
                   })
                 return Promise.all([prom1, prom2])
                 // .then(ignored => true)
@@ -779,9 +801,12 @@ export class Finances {
                   return Referrals.cutReferralCommission(ezyownerReferrerRefString)
                 }
                 const prom1 = ownerMoneyAccountRef.collection('transactions').add({
-                  type: 'payment',
+                  type: 'pay_in',
                   amount: ownerPriceToBePaidShare,
-                  previousBalance,
+                  prevAmount: previousBalance,
+                  newAmount: ownerNewBalance,
+                  finished: true,
+                  channel_name: 'internal',
                   timestamp: FieldValue.serverTimestamp(),
                 })
                 const prom2 = firestore.doc(`bucket/usersList/users/${ownerRef.id}`).get()
@@ -832,10 +857,13 @@ export class Finances {
         //add transaction on ezybiz
         promises.push(
           ezyBizMoneyAccountSnapshot.ref.collection('transactions').add({
-            type: 'payment_out',
+            type: 'pay_out',
             amount: bizTotalAmountToPay,
-            previousBalance: balance,
+            prevAmount: balance,
+            finished: true,
             timestamp: FieldValue.serverTimestamp(),
+            channel_name: 'internal',
+            newAmount: newBalance,
           })
         )
 
@@ -846,9 +874,10 @@ export class Finances {
           .then(ezybizSnapshot => {
             const { phonenumber: ezybizPhonenumber } = ezybizSnapshot.data()
             const ezyBizMessagePaymentIntent = {
-              type: Constants.MESSAGE_TYPE_FRIEGHT_PAYMENT,
+              type: Constants.MESSAGE_TYPE_FRIEGHT_PAYMENT_OUT,
               to: PhonenumberUtils.parsePhonenumberForMessaging(ezybizPhonenumber),
               data: {
+                amount: bizTotalAmountToPay,
                 name: title,
                 balance: newBalance,
               }
