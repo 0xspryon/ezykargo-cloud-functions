@@ -122,7 +122,7 @@ export class UsersIntent {
                         createdAt: FieldValue.serverTimestamp(),
                         review_by: data["userRef"],
                         freightage_ref: data["freightageRef"],
-                        reviewText: data["reviewText"],
+                        review_text: data["reviewText"],
                         avatarUrl: userData.avatarUrl,
                         fullName: userData.fullName,
                         driver: true
