@@ -835,7 +835,7 @@ export class Finances {
                       avatarUrl
                     } = driverSnapshot.data();
                     driverName = truckerFullName;
-
+                    console.log({ truckRef:  truckerTruck.truckRef})
                     /**
                      * Add trucker transaction into the transaction collection of the truck
                      */
