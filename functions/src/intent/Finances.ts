@@ -644,9 +644,13 @@ export class Finances {
         title,
         weight: weight_in_kg
       } = freightageSnapshot.data();
+
       const bizTotalAmountToPay =
         (bizAmount * weight_in_kg) / Finances.TON_TO_KILO_DIVISOR;
 
+      //Saving the ezykargoAmount as the rest of the 
+      //calculations so that the decimal places should
+      //be saved as the platforms money.
       let ezykargoAmount = bizTotalAmountToPay;
       const trucker_owner_amount =
         frieghtageRequestPrice - (frieghtageRequestPrice * 12) / 100;
@@ -659,7 +663,7 @@ export class Finances {
         const priceToBePaid =
           (totalWeight * trucker_owner_amount) / Finances.TON_TO_KILO_DIVISOR;
         ezykargoAmount = ezykargoAmount - priceToBePaid;
-        return {
+        return {  
           priceToBePaid,
           driverRefString: driverDatum.driverRef
           // truckRef: driverData.truckRef,
