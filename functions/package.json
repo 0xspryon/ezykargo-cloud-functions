@@ -1,5 +1,7 @@
 {
-  "engines": { "node": "8" },
+  "engines": {
+    "node": "8"
+  },
   "name": "functions",
   "scripts": {
     "lint": "tslint --project tsconfig.json",
@@ -13,6 +15,7 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/storage": "^1.7.0",
+    "@types/lodash": "^4.14.136",
     "axios": "^0.18.0",
     "body-parser": "^1.18.3",
     "cors": "^2.8.5",
