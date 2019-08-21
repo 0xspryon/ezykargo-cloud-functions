@@ -26,14 +26,51 @@ PUT freightage_picked_up
 {
   "mappings": {
     "properties": {
+      "amount": {
+        "type": "long"
+      },
+      "bizAmount": {
+        "type": "long"
+      },
+      "weight": {
+        "type": "long"
+      },
+      "volume": {
+        "type": "long"
+      },
+      "to": {
+        "type": "keyword"
+      },
+      "from": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text"
+      },
+      "ref_id": {
+        "type": "keyword"
+      },
+      "items": {
+        "properties": {
+          "from": {
+            "type": "keyword"
+          },
+          "quantity": {
+            "type": "long"
+          },
+          "weight": {
+            "type": "long"
+          },
+          "unit_type": {
+            "type": "keyword"
+          }
+        }
+      },
       "eventAt": {
         "type": "date"
       },
       "pickup": {
         "type": "boolean"
-      },
-      "ref_id": {
-        "type": "keyword"
       }
     }
   }
@@ -60,6 +97,43 @@ PUT freightage_completed
 {
   "mappings": {
     "properties": {
+      "amount": {
+        "type": "long"
+      },
+      "bizAmount": {
+        "type": "long"
+      },
+      "weight": {
+        "type": "long"
+      },
+      "volume": {
+        "type": "long"
+      },
+      "to": {
+        "type": "keyword"
+      },
+      "from": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text"
+      },
+      "items": {
+        "properties": {
+          "from": {
+            "type": "keyword"
+          },
+          "quantity": {
+            "type": "long"
+          },
+          "weight": {
+            "type": "long"
+          },
+          "unit_type": {
+            "type": "keyword"
+          }
+        }
+      },
       "eventAt": {
         "type": "date"
       },
