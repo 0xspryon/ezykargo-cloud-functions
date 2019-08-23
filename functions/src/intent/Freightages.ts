@@ -482,7 +482,7 @@ export class FreightagesIntent {
                                 )
                                 .then(() => {
                                     if (!drivers.map(driver => driver.completed).includes(false)) {
-                                        AnalyticscController.saveFreightageCompletedToAnalytics(freightageDataSnapshot.id)
+                                        AnalyticscController.saveFreightageCompletedToAnalytics(freightageData, freightageDataSnapshot.id)
                                     }
                                     const promises = [];
                                     if (

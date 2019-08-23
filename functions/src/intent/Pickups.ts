@@ -279,7 +279,7 @@ export class PickupsIntent {
                                         bizAmount,
                                     } = freightageData
                                     if (!drivers.map(driver => driver.pickup).includes(false)) {
-                                        AnalyticscController.saveFreightagePickedUpToAnalytics(freightageDataSnapshot.id)
+                                        AnalyticscController.saveFreightagePickedUpToAnalytics(freightageData,freightageDataSnapshot.id)
                                     }
                                     return Promise.resolve("Success");
                                 });

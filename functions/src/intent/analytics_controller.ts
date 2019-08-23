@@ -1,10 +1,12 @@
-import {FreightagesIntent} from "./Freightages";
+import { FreightagesIntent } from "./Freightages";
+
 const functions = require('firebase-functions');
 
 const request = require('request-promise');
 
 let elasticSearchConfig = functions.config().elasticsearch;
-let elasticSearchFreightUrl = (prefix: string, ref_id: string) => elasticSearchConfig.url + `freightage_${prefix}/_doc/` + ref_id;
+let elasticSearchFreightUrl = (prefix: string, ref_id: string) => elasticSearchConfig.url + `freightage_${prefix}/_doc/${ref_id}`;
+let elasticSearchFreightUpdateUrl = (prefix: string, ref_id: string) => elasticSearchConfig.url + `freightage_${prefix}/_update/${ref_id}`;
 let elasticSearchMethod = {
     post: 'POST',
     delete: 'DELETE',
@@ -13,9 +15,8 @@ let elasticSearchMethod = {
 
 export class AnalyticscController {
 
-    static saveFreightageDeclarationToAnalytics = (freightage, ref_id) => {
+    static saveFreightageDeclarationToAnalytics = (ref_id) => {
         const freightageDeclarationPrefix = 'created'
-
         let body = {
             eventAt: (new Date()).getTime() + 20,
             created: true,
@@ -35,10 +36,25 @@ export class AnalyticscController {
 
     }
 
-    static saveFreightagePickedUpToAnalytics = (ref_id) => {
+    static saveFreightagePickedUpToAnalytics = (freightage, ref_id) => {
         const freightagePickUpPrefix = 'picked_up'
 
+        const {
+            weight, volume, items,
+            to, title, from,
+            amount, bizAmount,
+        } = freightage
+
         let body = {
+            weight, volume,
+            to, title, from,
+            amount, bizAmount,
+            items: items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                unit_type: item.unit_type,
+                weight: item.weight,
+            })),
             pickup: true,
             eventAt: (new Date()).getTime() + 20,
             ref_id,
@@ -52,7 +68,7 @@ export class AnalyticscController {
         };
 
         return request(elasticsearchRequest).then(response => {
-            console.log('Elasticsearch Freightage pickup', response);
+            // console.log('Elasticsearch Freightage pickup', response);
         })
     }
 
@@ -73,29 +89,7 @@ export class AnalyticscController {
         };
 
         return request(elasticsearchRequest).then(response => {
-            console.log('Elasticsearch Freightage delivered', response);
-        })
-
-    }
-
-    static saveFreightageCompletedToAnalytics = (ref_id) => {
-        const freightagePickUpPrefix = 'completed'
-
-        let body = {
-            completed: true,
-            eventAt: (new Date()).getTime() + 20,
-            ref_id,
-        }
-
-        let elasticsearchRequest = {
-            method: elasticSearchMethod.put,
-            uri: elasticSearchFreightUrl(freightagePickUpPrefix, ref_id),
-            body,
-            json: true
-        };
-
-        return request(elasticsearchRequest).then(response => {
-            console.log('Elasticsearch Freightage completed', response);
+            // console.log('Elasticsearch Freightage delivered', response);
         })
 
     }
@@ -117,7 +111,7 @@ export class AnalyticscController {
         };
 
         return request(elasticsearchRequest).then(response => {
-            console.log('Elasticsearch Freightage idling', response);
+            // console.log('Elasticsearch Freightage idling', response);
         })
 
     }
@@ -139,7 +133,71 @@ export class AnalyticscController {
         };
 
         return request(elasticsearchRequest).then(response => {
-            console.log('Elasticsearch freightage deleted', response);
+            // console.log('Elasticsearch freightage deleted', response);
+        })
+
+    }
+
+    static saveFreightageCompletedToAnalytics = (freightage, ref_id) => {
+        const freightagePickUpPrefix = 'completed'
+
+        const {
+            weight, volume, items,
+            to, title, from,
+            amount, bizAmount,
+        } = freightage
+
+        const body = {
+            doc: {
+                weight, volume,
+                to, title, from,
+                amount, bizAmount,
+                completed: true,
+                items: items.map(item => ({
+                    name: item.name,
+                    quantity: item.quantity,
+                    unit_type: item.unit_type,
+                    weight: item.weight,
+                })),
+                eventAt: (new Date()).getTime() + 20,
+                ref_id,
+            },
+            doc_as_upsert: true,
+        }
+
+        const elasticsearchRequest = {
+            method: elasticSearchMethod.put,
+            uri: elasticSearchFreightUpdateUrl(freightagePickUpPrefix, ref_id),
+            body,
+            json: true
+        };
+
+        return request(elasticsearchRequest).then(response => {
+            // console.log('Elasticsearch Freightage completed', response);
+        })
+
+    }
+
+    static savePlatformIncomeToAnalytics = (ref_id, amount) => {
+        const freightagePickUpPrefix = 'completed'
+
+        const body = {
+            doc: {
+                platform_amount: amount,
+                paid: true,
+            },
+            doc_as_upsert: true
+        }
+
+        const elasticsearchRequest = {
+            method: elasticSearchMethod.put,
+            uri: elasticSearchFreightUpdateUrl(freightagePickUpPrefix, ref_id),
+            body,
+            json: true
+        };
+
+        return request(elasticsearchRequest).then(response => {
+            // console.log('Elasticsearch Freightage completed revenue', response);
         })
 
     }

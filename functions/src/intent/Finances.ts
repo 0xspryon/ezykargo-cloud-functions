@@ -4,6 +4,7 @@ import { Referrals } from "./Referrals";
 import { Constants } from "../utils/Constants";
 import { PhonenumberUtils } from "../utils/PhonenumberUtils";
 import { DocumentSnapshot } from "firebase-functions/lib/providers/firestore";
+import { AnalyticscController } from "./analytics_controller";
 const FieldValue = require("firebase-admin").firestore.FieldValue;
 const rp = require("request-promise");
 
@@ -70,7 +71,7 @@ export class Finances {
             if (transaction_status.toLowerCase() === "paid") {
               const moneyAccountDoc = firestoreDb.doc(
                 `/bucket/moneyAccount/moneyAccounts/${
-                  transaction.transaction_sender_reference
+                transaction.transaction_sender_reference
                 }`
               );
               moneyAccountDoc.get().then(moneyAccountSnapshot => {
@@ -202,7 +203,7 @@ export class Finances {
             if (transaction_status.toLowerCase() === "paid") {
               const moneyAccountDoc = firestoreDb.doc(
                 `/bucket/moneyAccount/moneyAccounts/${
-                  transaction.transaction_sender_reference
+                transaction.transaction_sender_reference
                 }`
               );
               moneyAccountDoc.get().then(moneyAccountSnapshot => {
@@ -334,12 +335,12 @@ export class Finances {
         method: "POST",
         uri: `https://www.wecashup.com/api/v2.0/merchants/${
           functions.config().wecashup.merchant_uid
-        }/transactions`,
+          }/transactions`,
         form: { ...formData }
       };
 
       return rp(options)
-        .then(function(body) {
+        .then(function (body) {
           const bodyData = JSON.parse(body);
           console.log(bodyData);
           const {
@@ -355,7 +356,7 @@ export class Finances {
             providerList: bodyData.response_content.providers_list
           });
         })
-        .catch(function(err) {
+        .catch(function (err) {
           console.log({ err });
           return snapshot.ref.child("response").set({ code: 500 });
         });
@@ -410,19 +411,19 @@ export class Finances {
         method: "POST",
         uri: `https://www.wecashup.com/api/v2.0/merchants/${
           functions.config().wecashup.merchant_uid
-        }/transactions`,
+          }/transactions`,
         form: { ...formData }
       };
 
       return rp(options)
-        .then(function(body) {
+        .then(function (body) {
           const bodyData = JSON.parse(body);
           console.log(bodyData);
           admin
             .database()
             .ref(
               `temp/transactions/${
-                bodyData.response_content.transaction.transaction_uid
+              bodyData.response_content.transaction.transaction_uid
               }`
             )
             .set({
@@ -434,7 +435,7 @@ export class Finances {
             code: 200
           });
         })
-        .catch(function(err) {
+        .catch(function (err) {
           console.log({ err });
           return snapshot.ref.child("response").set({ code: 500 });
         });
@@ -529,7 +530,7 @@ export class Finances {
       ) {
         const escrowRef = firestore.doc(
           `/bucket/moneyAccount/moneyAccounts/${userRef.id}/escrow/${
-            productRef.id
+          productRef.id
           }`
         );
         batch.set(escrowRef, {
@@ -582,7 +583,7 @@ export class Finances {
       return firestore
         .doc(
           `/bucket/moneyAccount/moneyAccounts/${userRef.id}/escrow/${
-            productRef.id
+          productRef.id
           }`
         )
         .get()
@@ -663,7 +664,7 @@ export class Finances {
         const priceToBePaid =
           (totalWeight * trucker_owner_amount) / Finances.TON_TO_KILO_DIVISOR;
         ezykargoAmount = ezykargoAmount - priceToBePaid;
-        return {  
+        return {
           priceToBePaid,
           driverRefString: driverDatum.driverRef
           // truckRef: driverData.truckRef,
@@ -835,7 +836,7 @@ export class Finances {
                       avatarUrl
                     } = driverSnapshot.data();
                     driverName = truckerFullName;
-                    console.log({ truckRef:  truckerTruck.truckRef})
+                    console.log({ truckRef: truckerTruck.truckRef })
                     /**
                      * Add trucker transaction into the transaction collection of the truck
                      */
@@ -947,7 +948,7 @@ export class Finances {
                   if (
                     ezyownerReferrerRefString !== Constants.EZYKARGO_REFERRER &&
                     ezyownerReferralCommissionCount <
-                      Constants.MAX_REFERRAL_COMMISSIONS_EZYOWNER
+                    Constants.MAX_REFERRAL_COMMISSIONS_EZYOWNER
                   ) {
                     return Referrals.cutReferralCommission(
                       ezyownerReferrerRefString
@@ -1057,11 +1058,11 @@ export class Finances {
           });
 
         //setting ezykargoPlatformEzybizReferralCommission
-        const ezyKargoPlatformEzybizCommission = ezykargoAmount;
+        // const ezyKargoPlatformEzybizCommission = ezykargoAmount;
         promises.push(
           Finances.addEzyKargoPlatformTransaction(
-            ezyKargoPlatformEzybizCommission,
-            `firestoreRef : ${freightageSnapshot.ref.path}`
+            ezykargoAmount,
+            freightageSnapshot.ref.id
           )
         );
         Promise.all(promises)
@@ -1081,17 +1082,15 @@ export class Finances {
    */
   public static addEzyKargoPlatformTransaction = async (
     amount,
-    reason,
+    freightageId,
     decrement = false
   ) => {
     let actualAmount = amount;
     if (decrement) actualAmount = -actualAmount;
-    const accountRef = admin.database().ref("z-platform/statistics/finances");
-    accountRef.child("pending_transactions").push({
-      amount,
-      shouldIncrement: !decrement,
-      reason
-    });
+    AnalyticscController.savePlatformIncomeToAnalytics(
+      freightageId,
+      decrement ? -amount : amount,
+    );
   };
 
   public static cronFinance = () => {

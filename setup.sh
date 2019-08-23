@@ -140,6 +140,12 @@ PUT freightage_completed
       "completed": {
           "type": "boolean"
         },
+      "paid": {
+          "type": "boolean"
+        },
+      "platform_amount": {
+        "type": "long"
+      },
       "ref_id": {
         "type": "keyword"
       }
