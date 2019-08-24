@@ -20,6 +20,7 @@ export class AnalyticscController {
         let body = {
             eventAt: (new Date()).getTime() + 20,
             created: true,
+            term:'created',
             ref_id,
         }
 
@@ -45,7 +46,7 @@ export class AnalyticscController {
             amount, bizAmount,
         } = freightage
 
-        let body = {
+        const body = {
             weight, volume,
             to, title, from,
             amount, bizAmount,
@@ -55,6 +56,7 @@ export class AnalyticscController {
                 unit_type: item.unit_type,
                 weight: item.weight,
             })),
+            term:'picked_up',
             pickup: true,
             eventAt: (new Date()).getTime() + 20,
             ref_id,
@@ -77,6 +79,7 @@ export class AnalyticscController {
 
         let body = {
             delivered: true,
+            term:'delivered',
             eventAt: (new Date()).getTime() + 20,
             ref_id,
         }
@@ -99,6 +102,7 @@ export class AnalyticscController {
 
         let body = {
             idle: true,
+            term:'idle',
             eventAt: (new Date()).getTime() + 20,
             ref_id,
         }
@@ -121,6 +125,7 @@ export class AnalyticscController {
 
         let body = {
             isDeleted: true,
+            term:'deleted',
             eventAt: (new Date()).getTime() + 20,
             ref_id,
         }
@@ -149,6 +154,7 @@ export class AnalyticscController {
 
         const body = {
             doc: {
+                term:'completed',
                 weight, volume,
                 to, title, from,
                 amount, bizAmount,
