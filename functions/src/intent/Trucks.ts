@@ -893,9 +893,8 @@ export class TrucksIntent {
       // create tv doc
       const TechnicalVistDoc = {
         imageUrl: IMAGE_MV_PATH,
-        expirationDate: TechnicalVistData.expiration_date,
+        expirationDate: TechnicalVistData.next_visit,
         date: TechnicalVistData.date,
-        recordNumber: TechnicalVistData.record_number,
         serialNumber: TechnicalVistData.serial_number,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
@@ -954,7 +953,12 @@ export class TrucksIntent {
           .ref(`/intents/add_technical_visit/${ref}/response`)
           .ref.set({ code: 201 })
       );
-      return Promise.all(promises);
+      return Promise.all(promises).catch((err) => {
+        admin
+          .database()
+          .ref(`/intents/add_technical_visit/${ref}/response`)
+          .ref.set({ code: 500 })
+      });
     });
 
   static listenAddInsurranceIntent = functions.database

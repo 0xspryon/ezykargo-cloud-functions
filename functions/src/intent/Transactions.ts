@@ -166,6 +166,7 @@ export class TransactionsIntent {
 
           let insufficientAmount = false;
           let monetBilResult = {};
+          let monetBilResultSuccess = false
           let resultTransaction = await firestore.runTransaction(t => {
             return t
               .get(userMoneyAccountRef)
@@ -183,10 +184,10 @@ export class TransactionsIntent {
                   form: { ...requestData }
                 };
                 return rp(options)
-                  .then(result => {
-                    monetBilResult = result;
+                  .then( async result => {
+                    monetBilResult = JSON.parse(result);
                     if (!result.success) return false;
-                    return moneyAccountDataSnapshot.ref
+                      await moneyAccountDataSnapshot.ref
                       .set(
                         {
                           withdrawCount:
@@ -197,7 +198,8 @@ export class TransactionsIntent {
                         },
                         { merge: true }
                       )
-                      .then(val => true);
+                      monetBilResultSuccess = true
+                      return true
                   })
                   .catch(error => {
                     monetBilResult = error;
@@ -206,7 +208,7 @@ export class TransactionsIntent {
               });
           });
 
-          if (resultTransaction) {
+          if (monetBilResultSuccess) {
             await transactionRef.set({
               ...requestData,
               ...monetBilResult,
@@ -232,7 +234,7 @@ export class TransactionsIntent {
               .ref(`/intents/make_withdrawal/${timestamp}/${ref}/response`)
               .ref.set({
                 code: 503,
-                ...monetBilResult
+                err: monetBilResult
               });
           }
         })
