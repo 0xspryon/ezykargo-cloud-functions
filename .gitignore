@@ -6,3 +6,6 @@ functions/package-lock\.json
 *.log
 
 *.js
+
+/node_modules
+.idea
